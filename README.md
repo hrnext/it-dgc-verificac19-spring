@@ -1,5 +1,7 @@
 <h1 align="center">Java Spring Digital Green Certificate SDK</h1>        
 
+[![Java CI with Maven](https://github.com/hrnext/it-dgc-verificac19-spring/actions/workflows/maven.yml/badge.svg?branch=main)](https://github.com/hrnext/it-dgc-verificac19-spring/actions/workflows/maven.yml)
+
 # Indice
 - [Contesto](#contesto)
 - [Installazione](#installazione)
@@ -8,7 +10,7 @@
   - [Dettaglio licenza](#dettaglio-licenza)
 
 # Contesto
-**Attenzione, questo non e' un repository ufficiale del Ministero della Salute, ma Ë derivato dalle specifiche presenti in <a href="https://github.com/ministero-salute/it-dgc-verificac19-sdk-android/">ministero-salute/it-dgc-verificac19-sdk-android</a>!**
+**Attenzione, questo non e' un repository ufficiale del Ministero della Salute, ma √® derivato dalle specifiche presenti in <a href="https://github.com/ministero-salute/it-dgc-verificac19-sdk-android/">ministero-salute/it-dgc-verificac19-sdk-android</a>!**
 
 Questo repository contiene un Software Development Kit (SDK), che consente di integrare nei sistemi
 le funzionalit&agrave; di verifica della Certificazione verde COVID-19, mediante 
@@ -20,7 +22,7 @@ a partire dalla presente SDK deve essere effettuato limitatamente alle
 informazioni pertinenti e alle operazioni strettamente necessarie alla verifica
 della validit&agrave; delle Certificazioni verdi COVID-19. Inoltre &egrave; fatto esplicito
 divieto di conservare il codice a barre bidimensionale (QR code) delle
-Certificazioni verdi COVID-19 sottoposte a verifica, nonchÈ di estrarre,
+Certificazioni verdi COVID-19 sottoposte a verifica, nonch√© di estrarre,
 consultare, registrare o comunque trattare per finalit&agrave; ulteriori rispetto
 a quelle previste per la verifica della Certificazione verde COVID-19 o le
 informazioni rilevate dalla lettura dei QR code e le informazioni fornite in
@@ -28,9 +30,9 @@ esito ai controlli, come indicato nel DPCM 12 ottobre 2021
  
 # Installazione
 
-Il codice sorgente Ë suddiviso nei due seguenti moduli maven.
-1. **it-dgc-verificac19-spring-core** Ë una libreria JAR che fornisce un supporto alle web application Spring che hanno la necessit‡ di integrare nei sistemi le funzionalit‡ di verifica della Certificazione verde COVID-19
-2. **it-dgc-verificac19-spring-rest-api** Ë una applicazione Spring Boot che funge da POC dell'estensione Java Spring.
+Il codice sorgente √® suddiviso nei due seguenti moduli maven.
+1. **it-dgc-verificac19-spring-core** √® una libreria JAR che fornisce un supporto alle web application Spring che hanno la necessit√† di integrare nei sistemi le funzionalit√† di verifica della Certificazione verde COVID-19
+2. **it-dgc-verificac19-spring-rest-api** √® una applicazione Spring Boot che funge da POC dell'estensione Java Spring.
 
 ###   
 
