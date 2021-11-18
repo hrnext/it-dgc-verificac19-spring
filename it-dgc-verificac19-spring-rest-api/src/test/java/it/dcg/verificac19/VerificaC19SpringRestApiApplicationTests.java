@@ -3,7 +3,7 @@ package it.dcg.verificac19;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
+//@SpringBootTest // TODO Write test
 class ItdgcVerificac19SpringRestApiApplicationTests {
 
 	@Test
