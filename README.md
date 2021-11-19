@@ -61,7 +61,17 @@ verifica.
 Basandosi su questi dati &egrave; possibile disegnare la UI e fornire all'operatore lo
 stato della verifica del DGC.
  
-    
+## Java 8 support
+
+Selezionado il profilo Maven apposito, si abilita il supporto a Java 8
+
+```
+>mvn clean package -Pjava8
+```
+
+Per il supporto a Java 8 per le librerie:
+<a href="https://github.com/DIGGSweden/dgc-java/blob/main/README.md#for-java-8-users">dgc-java</a>
+
 # Licenza
 
 ## Dettaglio Licenza
