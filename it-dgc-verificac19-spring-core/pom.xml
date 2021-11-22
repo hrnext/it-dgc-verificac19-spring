@@ -20,6 +20,7 @@
 		<retrofit.version>2.5.0</retrofit.version>
 		<converter-json.version>2.5.0</converter-json.version>
 		<dgc-java.version>1.0.1</dgc-java.version>
+		<zxing.version>3.4.1</zxing.version>
 	</properties>
 
 	<dependencies>
@@ -80,6 +81,18 @@
 			<groupId>se.digg.dgc</groupId>
 			<artifactId>dgc-create-validate</artifactId>
 			<version>${dgc-java.version}</version>
+		</dependency>
+		
+		<dependency>
+		  <groupId>com.google.zxing</groupId>
+		  <artifactId>core</artifactId>
+		  <version>${zxing.version}</version>
+		</dependency>
+		    
+		<dependency>
+		  <groupId>com.google.zxing</groupId>
+		  <artifactId>javase</artifactId>
+		  <version>${zxing.version}</version>
 		</dependency>
 
 		<dependency>

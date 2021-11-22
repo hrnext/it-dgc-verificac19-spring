@@ -24,6 +24,17 @@ public class CertificateSimple implements Serializable {
   }
 
   /**
+   * 
+   * @param certificateStatus
+   * @param timeStamp
+   */
+  public CertificateSimple(CertificateStatus certificateStatus) {
+    super();
+    this.certificateStatus = certificateStatus;
+    this.timeStamp = LocalDateTime.now();
+  }
+
+  /**
    * @return the person
    */
   public SimplePersonModel getPerson() {

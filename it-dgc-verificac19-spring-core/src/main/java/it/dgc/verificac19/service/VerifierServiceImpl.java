@@ -10,7 +10,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+
 import javax.annotation.PostConstruct;
+
 import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,12 +32,13 @@ import it.dgc.verificac19.model.CertificateStatus;
 import it.dgc.verificac19.model.TestResult;
 import it.dgc.verificac19.model.TestType;
 import it.dgc.verificac19.model.ValidationRulesEnum;
+import se.digg.dgc.encoding.impl.DefaultBarcodeDecoder;
 import se.digg.dgc.payload.v1.DigitalCovidCertificate;
 import se.digg.dgc.payload.v1.RecoveryEntry;
 import se.digg.dgc.payload.v1.TestEntry;
 import se.digg.dgc.payload.v1.VaccinationEntry;
-import se.digg.dgc.service.DGCDecoder;
-import se.digg.dgc.service.impl.DefaultDGCDecoder;
+import se.digg.dgc.service.DGCBarcodeDecoder;
+import se.digg.dgc.service.impl.DefaultDGCBarcodeDecoder;
 import se.digg.dgc.signatures.CertificateProvider;
 
 @Service
@@ -49,52 +52,74 @@ public class VerifierServiceImpl implements VerifierService {
   @Autowired
   Preferences preferences;
 
-  private DGCDecoder dgcDecoder;
+  private DGCBarcodeDecoder dgcBarcodeDecoder;
 
   @PostConstruct
   public void init() {
-    this.dgcDecoder = new DefaultDGCDecoder(null, new CertificateProvider() {
+    this.dgcBarcodeDecoder = new DefaultDGCBarcodeDecoder(null, new CertificateProvider() {
       @Override
       public List<X509Certificate> getCertificates(String country, byte[] kid) {
         String base64Kid = Base64.encodeBase64String(kid);
         X509Certificate cert = (X509Certificate) verifierRepository.getCertificate(base64Kid);
         return cert != null ? Arrays.asList(cert) : Lists.newArrayList();
       }
-    });
+    }, new DefaultBarcodeDecoder());
+
+  }
+
+  @Override
+  public CertificateSimple verify(byte[] qrCodeImg) {
+
+    try {
+
+      DigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decodeBarcode(qrCodeImg);
+
+      return validate(digitalCovidCertificate);
+
+    } catch (CertificateExpiredException | SignatureException e) {
+      return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
+    } catch (Exception e) {
+      return new CertificateSimple(CertificateStatus.NOT_VALID);
+    }
 
   }
 
   @Override
   public CertificateSimple verify(String qrCodeTxt) {
 
-    CertificateSimple certificateSimple = new CertificateSimple();
-
     try {
 
-      DigitalCovidCertificate digitalCovidCertificate = dgcDecoder.decode(qrCodeTxt);
+      DigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decode(qrCodeTxt);
 
-      String certificateIdentifier = extractUVCI(digitalCovidCertificate);
-
-      if (Strings.isNullOrEmpty(certificateIdentifier)) {
-        certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
-      } else if (verifierRepository.checkInBlackList(certificateIdentifier)) {
-        certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
-      } else {
-        certificateSimple.setCertificateStatus(getCertificateStatus(digitalCovidCertificate));
-      }
-
-      certificateSimple.setPerson(new SimplePersonModel(digitalCovidCertificate.getNam().getFnt(),
-          digitalCovidCertificate.getNam().getFn(), digitalCovidCertificate.getNam().getGnt(),
-          digitalCovidCertificate.getNam().getGn()));
-
-      certificateSimple.setDateOfBirth(digitalCovidCertificate.getDateOfBirth().asLocalDate());
-      certificateSimple.setTimeStamp(LocalDateTime.now());
+      return validate(digitalCovidCertificate);
 
     } catch (CertificateExpiredException | SignatureException e) {
-      certificateSimple.setCertificateStatus(CertificateStatus.NOT_EU_DCC);
+      return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
     } catch (Exception e) {
-      certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
+      return new CertificateSimple(CertificateStatus.NOT_VALID);
     }
+  }
+
+  private CertificateSimple validate(DigitalCovidCertificate digitalCovidCertificate) {
+
+    CertificateSimple certificateSimple = new CertificateSimple();
+
+    String certificateIdentifier = extractUVCI(digitalCovidCertificate);
+
+    if (Strings.isNullOrEmpty(certificateIdentifier)) {
+      certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
+    } else if (verifierRepository.checkInBlackList(certificateIdentifier)) {
+      certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
+    } else {
+      certificateSimple.setCertificateStatus(getCertificateStatus(digitalCovidCertificate));
+    }
+
+    certificateSimple.setPerson(new SimplePersonModel(digitalCovidCertificate.getNam().getFnt(),
+        digitalCovidCertificate.getNam().getFn(), digitalCovidCertificate.getNam().getGnt(),
+        digitalCovidCertificate.getNam().getGn()));
+
+    certificateSimple.setDateOfBirth(digitalCovidCertificate.getDateOfBirth().asLocalDate());
+    certificateSimple.setTimeStamp(LocalDateTime.now());
 
     return certificateSimple;
   }
@@ -338,5 +363,6 @@ public class VerifierServiceImpl implements VerifierService {
     return preferences.getValidationRuleValueByNameAndType(
         ValidationRulesEnum.VACCINE_END_DAY_COMPLETE, vaccineType);
   }
+
 
 }

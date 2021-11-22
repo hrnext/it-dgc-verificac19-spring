@@ -6,4 +6,6 @@ public interface VerifierService {
 
   CertificateSimple verify(String qrCodeTxt);
 
+  CertificateSimple verify(byte[] qrCodeImage);
+
 }
