@@ -86,7 +86,7 @@ public class VerifierRepositoryImpl implements VerifierRepository {
     if (oKey.isPresent()) {
       try {
         Key key = oKey.get();
-        return Utility.base64ToX509Certificate(key.getKey());
+        return Utility.base64ToX509Certificate(key.getValue());
       } catch (CertificateException e) {
         LOG.error("Certificate error", e);
         return null;

@@ -24,7 +24,7 @@ public class Key implements Serializable {
   private String kid;
 
   @Lob
-  private String key;
+  private String value;
 
   public Key() {
     super();
@@ -37,7 +37,7 @@ public class Key implements Serializable {
   public Key(String kid, String key) {
     super();
     this.kid = kid;
-    this.key = key;
+    this.value = key;
   }
 
   /**
@@ -57,15 +57,15 @@ public class Key implements Serializable {
   /**
    * @return the key
    */
-  public String getKey() {
-    return key;
+  public String getValue() {
+    return value;
   }
 
   /**
    * @param key the key to set
    */
-  public void setKey(String key) {
-    this.key = key;
+  public void setValue(String key) {
+    this.value = key;
   }
 
 }
