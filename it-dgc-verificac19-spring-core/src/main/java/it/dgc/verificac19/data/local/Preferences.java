@@ -13,7 +13,7 @@ import it.dgc.verificac19.model.ValidationRulesEnum;
 @Component
 public class Preferences {
 
-  private Long resumeToken;
+  private long resumeToken;
 
   private LocalDateTime dateLastFetch;
 
@@ -29,7 +29,7 @@ public class Preferences {
    * This method clears all values from the preferences.
    */
   public void clear() {
-    this.resumeToken = null;
+    this.resumeToken = -1L;
     this.dateLastFetch = null;
     this.validationRulesJson = new ArrayList<Rule>();
   }
@@ -37,7 +37,7 @@ public class Preferences {
   /**
    * @return the resumeToken
    */
-  public Long getResumeToken() {
+  public long getResumeToken() {
     return resumeToken;
   }
 
