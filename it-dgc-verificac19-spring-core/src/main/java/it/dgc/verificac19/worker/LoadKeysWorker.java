@@ -1,6 +1,5 @@
 package it.dgc.verificac19.worker;
 
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +32,7 @@ public class LoadKeysWorker {
    *
    */
   @Retryable(maxAttempts = Integer.MAX_VALUE)
-  @Scheduled(timeUnit = TimeUnit.DAYS, fixedRate = 1)
+  @Scheduled(cron = "@daily")
   public void doWork() {
     LOG.info("key fetching start");
     boolean res = verifierRepository.syncData();
