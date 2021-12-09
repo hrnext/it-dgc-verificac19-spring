@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>it.dgc</groupId>
 	<artifactId>it-dgc-verificac19-spring-core</artifactId>
-	<version>0.0.1</version>
+	<version>0.0.2</version>
 	<name>it-dgc-verificac19-spring-core</name>
 	<description>dgc Core</description>
 
