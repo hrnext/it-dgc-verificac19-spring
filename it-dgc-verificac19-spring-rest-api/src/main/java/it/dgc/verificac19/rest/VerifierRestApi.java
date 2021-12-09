@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import it.dgc.verificac19.data.local.Preferences;
 import it.dgc.verificac19.model.CertificateSimple;
+import it.dgc.verificac19.model.ValidationScanMode;
 import it.dgc.verificac19.service.VerifierService;
 
 @RestController
@@ -37,7 +38,7 @@ public class VerifierRestApi {
       LOG.info("Not updated");
       return ResponseEntity.ok().build();
     } else {
-      CertificateSimple certificateSimple = verifierService.verify(qrCodeTxt);
+      CertificateSimple certificateSimple = verifierService.verify(qrCodeTxt, ValidationScanMode.NORMAL_DGP);
 
       switch (certificateSimple.getCertificateStatus()) {
         case NOT_EU_DCC:
@@ -63,7 +64,7 @@ public class VerifierRestApi {
     } else {
       CertificateSimple certificateSimple;
       try {
-        certificateSimple = verifierService.verify(file.getBytes());
+        certificateSimple = verifierService.verify(file.getBytes(), ValidationScanMode.NORMAL_DGP);
       } catch (IOException e) {
         LOG.error("Error on decode image", e);
         return ResponseEntity.internalServerError().build();

@@ -10,20 +10,16 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
 import javax.annotation.PostConstruct;
-
 import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
-
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-
 import it.dgc.verificac19.data.VerifierRepository;
 import it.dgc.verificac19.data.local.Preferences;
 import it.dgc.verificac19.model.CertificateSimple;
@@ -32,6 +28,7 @@ import it.dgc.verificac19.model.CertificateStatus;
 import it.dgc.verificac19.model.TestResult;
 import it.dgc.verificac19.model.TestType;
 import it.dgc.verificac19.model.ValidationRulesEnum;
+import it.dgc.verificac19.model.ValidationScanMode;
 import se.digg.dgc.encoding.impl.DefaultBarcodeDecoder;
 import se.digg.dgc.payload.v1.DigitalCovidCertificate;
 import se.digg.dgc.payload.v1.RecoveryEntry;
@@ -68,13 +65,13 @@ public class VerifierServiceImpl implements VerifierService {
   }
 
   @Override
-  public CertificateSimple verify(byte[] qrCodeImg) {
+  public CertificateSimple verify(byte[] qrCodeImg, ValidationScanMode validationScanMode) {
 
     try {
 
       DigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decodeBarcode(qrCodeImg);
 
-      return validate(digitalCovidCertificate);
+      return validate(digitalCovidCertificate, validationScanMode);
 
     } catch (CertificateExpiredException | SignatureException e) {
       return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
@@ -85,13 +82,13 @@ public class VerifierServiceImpl implements VerifierService {
   }
 
   @Override
-  public CertificateSimple verify(String qrCodeTxt) {
+  public CertificateSimple verify(String qrCodeTxt, ValidationScanMode validationScanMode) {
 
     try {
 
       DigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decode(qrCodeTxt);
 
-      return validate(digitalCovidCertificate);
+      return validate(digitalCovidCertificate, validationScanMode);
 
     } catch (CertificateExpiredException | SignatureException e) {
       return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
@@ -100,7 +97,8 @@ public class VerifierServiceImpl implements VerifierService {
     }
   }
 
-  private CertificateSimple validate(DigitalCovidCertificate digitalCovidCertificate) {
+  private CertificateSimple validate(DigitalCovidCertificate digitalCovidCertificate,
+      ValidationScanMode validationScanMode) {
 
     CertificateSimple certificateSimple = new CertificateSimple();
 
@@ -109,6 +107,9 @@ public class VerifierServiceImpl implements VerifierService {
     if (Strings.isNullOrEmpty(certificateIdentifier)) {
       certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
     } else if (verifierRepository.checkInBlackList(certificateIdentifier)) {
+      certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
+    } else if (validationScanMode == ValidationScanMode.SUPER_DGP
+        && digitalCovidCertificate.getT() != null) {
       certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
     } else {
       certificateSimple.setCertificateStatus(getCertificateStatus(digitalCovidCertificate));

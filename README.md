@@ -47,7 +47,8 @@ Esempio:
 
 	public void test(){
 	  String qrCodeTxt = 'HC1:6BF.......';
-	  CertificateSimple certificateSimple = verifierService.verify(qrCodeTxt);
+	  ValidationScanMode validationScanMode = ValidationScanMode.CLASSIC_DGP;
+	  CertificateSimple certificateSimple = verifierService.verify(qrCodeTxt, validationScanMode);
 	}
 ```
 
@@ -56,7 +57,10 @@ Osservando la risposta del metodo &egrave; restituito un oggetto
 il risultato della verifica.
 Il data model contiene i dati relativi alla
 persona, la data di nascita, il timestamp di verifica e lo stato della
-verifica.
+verifica. 
+
+Tipologia base (NORMAL_DGP): l'sdk considera valide le certificazioni verdi generate da vaccinazione, da guarigione, da tampone.
+Tipologia rafforzata (SUPER_DGP): l'sdk considera valide solo le certificazioni verdi generate da vaccinazione o da guarigione.
 
 Basandosi su questi dati &egrave; possibile disegnare la UI e fornire all'operatore lo
 stato della verifica del DGC.
