@@ -3,7 +3,9 @@ package it.dgc.verificac19.worker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.EventListener;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -40,6 +42,11 @@ public class LoadKeysWorker {
     if (!res) {
       throw new RuntimeException("Error on sync data, retry");
     }
+  }
+  
+  @EventListener(ApplicationReadyEvent.class)
+  public void onSchedule() {
+      doWork();
   }
 
 }
