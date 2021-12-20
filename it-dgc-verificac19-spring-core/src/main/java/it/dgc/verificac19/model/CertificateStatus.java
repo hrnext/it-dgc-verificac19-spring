@@ -6,5 +6,5 @@ package it.dgc.verificac19.model;
  *
  */
 public enum CertificateStatus {
-  NOT_VALID, NOT_VALID_YET, VALID, PARTIALLY_VALID, NOT_EU_DCC;
+  NOT_VALID, NOT_VALID_YET, VALID, NOT_EU_DCC;
 }

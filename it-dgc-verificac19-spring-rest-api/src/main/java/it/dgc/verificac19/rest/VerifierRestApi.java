@@ -46,7 +46,6 @@ public class VerifierRestApi {
         case NOT_VALID_YET:
           LOG.info("Invalid");
           break;
-        case PARTIALLY_VALID:
         case VALID:
           LOG.info("Valid");
           break;
@@ -76,7 +75,6 @@ public class VerifierRestApi {
         case NOT_VALID_YET:
           LOG.info("Invalid");
           break;
-        case PARTIALLY_VALID:
         case VALID:
           LOG.info("Valid");
           break;

@@ -166,7 +166,7 @@ public class VerifierServiceImpl implements VerifierService {
           .isAfter(startDate.plusDays(Long.valueOf(getRecoveryCertEndDay())))) {
         return CertificateStatus.NOT_VALID;
       } else if (LocalDate.now().isAfter(endDate)) {
-        return CertificateStatus.PARTIALLY_VALID;
+        return CertificateStatus.VALID;
       } else {
         return CertificateStatus.VALID;
       }
@@ -215,7 +215,7 @@ public class VerifierServiceImpl implements VerifierService {
         } else if (LocalDate.now().isAfter(endDate)) {
           return CertificateStatus.NOT_VALID;
         } else {
-          return CertificateStatus.PARTIALLY_VALID;
+          return CertificateStatus.VALID;
         }
 
       } else if (lastVaccination.getDn() >= lastVaccination.getSd()) {
