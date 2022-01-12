@@ -16,4 +16,6 @@ public interface VerifierRepository {
 
   boolean checkInBlackList(String kid);
 
+  boolean checkInRevokedList(String hashedUVCI);
+
 }

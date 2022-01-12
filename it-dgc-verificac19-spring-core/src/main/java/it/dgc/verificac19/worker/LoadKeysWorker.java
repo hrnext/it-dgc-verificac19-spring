@@ -43,10 +43,10 @@ public class LoadKeysWorker {
       throw new RuntimeException("Error on sync data, retry");
     }
   }
-  
+
   @EventListener(ApplicationReadyEvent.class)
   public void onSchedule() {
-      doWork();
+    doWork();
   }
 
 }

@@ -47,7 +47,13 @@ public enum ValidationRulesEnum {
   VACCINE_END_DAY_COMPLETE("vaccine_end_day_complete"),
 
   @SerializedName(value = "black_list_uvci")
-  BLACK_LIST_UVCI("black_list_uvci");
+  BLACK_LIST_UVCI("black_list_uvci"),
+
+  @SerializedName(value = "DRL_SYNC_ACTIVE")
+  DRL_SYNC_ACTIVE("DRL_SYNC_ACTIVE"),
+
+  @SerializedName(value = "MAX_RETRY")
+  MAX_RETRY("MAX_RETRY");
 
   @JsonValue
   private String value;

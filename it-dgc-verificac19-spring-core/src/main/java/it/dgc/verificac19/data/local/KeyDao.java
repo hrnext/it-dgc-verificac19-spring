@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public interface KeyDao extends JpaRepository<Key, String> {
 
-  @Transactional
-  void deleteAllByKidNotIn(List<String> keyIds);
+    @Transactional
+    void deleteAllByKidNotIn(List<String> keyIds);
 
 }

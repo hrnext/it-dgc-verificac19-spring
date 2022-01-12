@@ -7,28 +7,39 @@ import java.security.cert.CertificateException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+
 import javax.annotation.PostConstruct;
+
 import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import it.dgc.verificac19.data.local.BlackListDao;
 import it.dgc.verificac19.data.local.Blacklist;
+import it.dgc.verificac19.data.local.Drl;
+import it.dgc.verificac19.data.local.DrlDao;
 import it.dgc.verificac19.data.local.Key;
 import it.dgc.verificac19.data.local.KeyDao;
 import it.dgc.verificac19.data.local.Preferences;
+import it.dgc.verificac19.data.local.RevokedPass;
+import it.dgc.verificac19.data.local.RevokedPassDao;
 import it.dgc.verificac19.data.remote.ApiServiceClient;
+import it.dgc.verificac19.data.remote.model.CertificateRevocationList;
+import it.dgc.verificac19.data.remote.model.CrlStatus;
 import it.dgc.verificac19.data.remote.model.Rule;
 import it.dgc.verificac19.model.ValidationRulesEnum;
 import it.dgc.verificac19.utility.Utility;
 import okhttp3.Headers;
 import okhttp3.ResponseBody;
 import retrofit2.Call;
+import retrofit2.HttpException;
 import retrofit2.Response;
 
 /**
@@ -59,6 +70,14 @@ public class VerifierRepositoryImpl implements VerifierRepository {
   @Autowired
   KeyDao keyDao;
 
+  @Autowired
+  DrlDao drlDao;
+
+  @Autowired
+  RevokedPassDao revokedPassDao;
+
+  private int realmSize;
+
   @PostConstruct
   public void init() {
     this.validCertList = new ArrayList<String>();
@@ -73,6 +92,10 @@ public class VerifierRepositoryImpl implements VerifierRepository {
     } catch (IOException | RuntimeException e) {
       LOG.error("Fetch validation rules / certificates error", e);
       return false;
+    }
+
+    if (preferences.isDrlSyncActive()) {
+      getCRLStatus();
     }
 
     preferences.setDateLastFetch(LocalDateTime.now());
@@ -106,6 +129,17 @@ public class VerifierRepositoryImpl implements VerifierRepository {
       LOG.error("Error", e);
       return false;
     }
+  }
+
+  @Override
+  public boolean checkInRevokedList(String hashedUVCI) {
+    try {
+      return revokedPassDao.findOneByHashedUVCI(hashedUVCI).isPresent();
+    } catch (Exception e) {
+      LOG.error("checkInRevokedList exception: ", e);
+      return false;
+    }
+
   }
 
   private boolean fetchCertificates() throws IOException {
@@ -202,6 +236,21 @@ public class VerifierRepositoryImpl implements VerifierRepository {
 
         blackListDao.saveAllAndFlush(listBlacklist);
       }
+
+      Optional<Rule> oDrlSynctActiveRule = ValidationRules.stream().filter(new Predicate<Rule>() {
+        @Override
+        public boolean test(Rule t) {
+          return t.getName() != null && t.getName().equals(ValidationRulesEnum.DRL_SYNC_ACTIVE);
+        }
+      }).findFirst();
+
+      if (oDrlSynctActiveRule.isPresent()) {
+        String value = oBlacklistRule.get().getValue();
+        if (value != null && value == "true") {
+          preferences.setDrlSyncActive(true);
+        }
+      }
+
       return true;
     } else {
       return false;
@@ -220,6 +269,239 @@ public class VerifierRepositoryImpl implements VerifierRepository {
    */
   public void setValidCertList(List<String> validCertList) {
     this.validCertList = validCertList;
+  }
+
+  private boolean outDatedVersion(CrlStatus crlStatus) {
+    return (crlStatus.getVersion() != preferences.getCurrentVersion());
+  }
+
+  private long getCurrentVersionDrl() {
+    Optional<Drl> drl = drlDao.findFirstOrderById();
+    if (drl.isPresent()) {
+      return drl.get().getVersion();
+    } else {
+      return 0;
+    }
+  }
+
+  private void saveLastFetchDate() {
+    preferences.setDrlDateLastFetch(LocalDateTime.now());
+  }
+
+  private boolean isDownloadCompleted() {
+    return preferences.getTotalNumberUCVI() == realmSize;
+  }
+
+  private void manageFinalReconciliation() {
+    saveLastFetchDate();
+    checkCurrentDownloadSize();
+    if (!isDownloadCompleted()) {
+      LOG.info("Reconciliation", "final reconciliation failed!");
+      handleErrorState();
+    } else
+      LOG.info("Reconciliation", "final reconciliation completed!");
+  }
+
+  private void handleErrorState() {
+    clearDBAndPrefs();
+    this.syncData();
+  }
+
+  private void clearDBAndPrefs() {
+    try {
+      preferences.clearDrlPrefs();
+      deleteAllFromDB();
+    } catch (Exception e) {
+      LOG.error("clearDBAndPrefs exception: ", e);
+    }
+  }
+
+  private void deleteAllFromDB() {
+    try {
+      revokedPassDao.deleteAll();
+    } catch (Exception e) {
+      LOG.error("deleteAllFromRealm", e);
+    }
+  }
+
+  private void checkCurrentDownloadSize() {
+    List<RevokedPass> revokedPasses = revokedPassDao.findAll();
+    realmSize = revokedPasses.size();
+  }
+
+  private void getCRLStatus() {
+    try {
+
+      long version = getCurrentVersionDrl();
+      preferences.setCurrentVersion(version);
+      LOG.info("Version DRL: {} ", version);
+
+      Call<CrlStatus> call =
+          apiServiceClient.getApiCertificate().getCRLStatus(preferences.getCurrentVersion());
+      Response<CrlStatus> response = call.execute();
+      if (response.isSuccessful()) {
+        CrlStatus crlStatus = response.body();
+        if (response.body() != null) {
+          if (outDatedVersion(crlStatus)) {
+            saveCrlStatusInfo(crlStatus);
+            downloadChunks(crlStatus);
+          } else {
+            manageFinalReconciliation();
+          }
+        }
+
+      } else {
+        throw new HttpException(response);
+      }
+
+    } catch (HttpException e) {
+      if (e.code() >= 400 && e.code() <= 407) {
+        clearDBAndPrefs();
+        throw e;
+
+      }
+    } catch (IOException e) {
+      LOG.error("Error: ", e);
+    }
+  }
+
+  private void downloadChunks(CrlStatus crlStatus) {
+    if (crlStatus != null) {
+
+      while (noMoreChunks(crlStatus)) {
+        try {
+          Call<CertificateRevocationList> call = apiServiceClient.getApiCertificate()
+              .getRevokeList(preferences.getCurrentVersion(), preferences.getCurrentChunk() + 1);
+
+          Response<CertificateRevocationList> response = call.execute();
+
+          if (response.isSuccessful()) {
+            getRevokeList(crlStatus.getVersion(), response.body());
+          } else {
+            throw new HttpException(response);
+          }
+        } catch (HttpException e) {
+          if (e.code() >= 400 && e.code() <= 407) {
+            LOG.error(e.toString(), e.message());
+            clearDBAndPrefs();
+            throw e;
+          } else {
+            LOG.error("downloadChunks: ", e.message());
+            break;
+          }
+        } catch (Exception e) {
+          LOG.error("downloadChunks", e);
+          break;
+        }
+      }
+
+      if (isDownloadComplete(crlStatus)) {
+
+        saveDrlStatusInDB(crlStatus);
+
+        preferences.setCurrentVersion(preferences.getRequestedVersion());
+        preferences.setCurrentChunk(0);
+        preferences.setTotalChunk(0);
+        getCRLStatus();
+        LOG.info("DownloadChunks: Last chunk processed, versions updated.");
+      }
+    }
+  }
+
+  private void saveDrlStatusInDB(CrlStatus crlStatus) {
+    Drl drl = new Drl(crlStatus.getId(), crlStatus.getVersion(), crlStatus.getTotalChunk());
+    drlDao.save(drl);
+  }
+
+  private boolean isDownloadComplete(CrlStatus crlStatus) {
+    return preferences.getCurrentChunk() == crlStatus.getTotalChunk();
+  }
+
+  private void getRevokeList(Long version, CertificateRevocationList certificateRevocationList) {
+    if (version == certificateRevocationList.getVersion()) {
+      preferences.setCurrentChunk(preferences.getCurrentChunk() + 1);
+      boolean isFirstChunk = preferences.getCurrentChunk() == 1;
+      if (isFirstChunk && certificateRevocationList.getDelta() == null) {
+        deleteAllFromDB();
+      }
+      persistRevokes(certificateRevocationList);
+    } else {
+      clearDBAndPrefs();
+      this.syncData();
+    }
+
+  }
+
+  private void persistRevokes(CertificateRevocationList certificateRevocationList) {
+
+    try {
+      List<String> revokedUcviList = certificateRevocationList.getRevokedUcvi();
+
+      if (revokedUcviList != null) {
+        LOG.info("persistRevokes: adding UCVI list.");
+        insertListToDB(revokedUcviList);
+      } else if (certificateRevocationList.getDelta() != null) {
+        LOG.info("persistRevokes: manage delta insertions and deletions.");
+        List<String> deltaInsertList = certificateRevocationList.getDelta().getInsertions();
+        List<String> deltaDeleteList = certificateRevocationList.getDelta().getDeletions();
+
+        if (deltaInsertList != null) {
+          LOG.info("DeltaInsertions size: " + deltaInsertList.size());
+          insertListToDB(deltaInsertList);
+        }
+        if (deltaDeleteList != null) {
+          LOG.info("DeltaDeletion size: " + deltaDeleteList.size());
+          deleteListFromDB(deltaDeleteList);
+        }
+      }
+    } catch (Exception e) {
+      LOG.error("persistRevokes exception: ", e);
+    }
+
+  }
+
+  private void saveCrlStatusInfo(CrlStatus crlStatus) {
+    preferences.setTotalChunk(crlStatus.getTotalChunk());
+    preferences.setRequestedVersion(crlStatus.getVersion());
+    preferences
+        .setCurrentVersion(crlStatus.getFromVersion() != null ? crlStatus.getFromVersion() : 0);
+    preferences.setChunk(crlStatus.getChunk());
+    preferences.setTotalNumberUCVI(crlStatus.getTotalNumberUCVI());
+  }
+
+  private boolean noMoreChunks(CrlStatus status) {
+
+    return preferences.getCurrentChunk() < status.getTotalChunk();
+  }
+
+  private void insertListToDB(List<String> deltaInsertList) {
+    try {
+
+      Iterator<String> it = deltaInsertList.iterator();
+      List<RevokedPass> revokedPasses = new ArrayList<RevokedPass>();
+      while (it.hasNext()) {
+        String hashedUVCI = it.next();
+        revokedPasses.add(new RevokedPass(hashedUVCI));
+      }
+
+      revokedPassDao.saveAll(revokedPasses);
+      LOG.info("Revoke inserted count: " + deltaInsertList.size());
+    } catch (Exception e) {
+      LOG.error("insertListToDB exception", e);
+    }
+  }
+
+  private void deleteListFromDB(List<String> deltaDeleteList) {
+
+    try {
+
+      revokedPassDao.deleteAllByHashedUVCIIn(deltaDeleteList);
+      LOG.info("Revoke deleted count: " + deltaDeleteList.size());
+
+    } catch (Exception e) {
+      LOG.info("deleteListFromDB exception", e);
+    }
+
   }
 
 }
