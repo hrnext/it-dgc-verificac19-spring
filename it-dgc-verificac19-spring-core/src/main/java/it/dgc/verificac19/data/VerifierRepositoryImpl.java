@@ -12,15 +12,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-
 import javax.annotation.PostConstruct;
-
 import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 import it.dgc.verificac19.data.local.BlackListDao;
 import it.dgc.verificac19.data.local.Blacklist;
 import it.dgc.verificac19.data.local.Drl;
@@ -76,7 +73,7 @@ public class VerifierRepositoryImpl implements VerifierRepository {
   @Autowired
   RevokedPassDao revokedPassDao;
 
-  private int realmSize;
+  private int revokedPassesSize;
 
   @PostConstruct
   public void init() {
@@ -276,7 +273,7 @@ public class VerifierRepositoryImpl implements VerifierRepository {
   }
 
   private long getCurrentVersionDrl() {
-    Optional<Drl> drl = drlDao.findFirstOrderById();
+    Optional<Drl> drl = drlDao.findFirstByOrderById();
     if (drl.isPresent()) {
       return drl.get().getVersion();
     } else {
@@ -289,7 +286,7 @@ public class VerifierRepositoryImpl implements VerifierRepository {
   }
 
   private boolean isDownloadCompleted() {
-    return preferences.getTotalNumberUCVI() == realmSize;
+    return preferences.getTotalNumberUCVI() == revokedPassesSize;
   }
 
   private void manageFinalReconciliation() {
@@ -298,8 +295,9 @@ public class VerifierRepositoryImpl implements VerifierRepository {
     if (!isDownloadCompleted()) {
       LOG.info("Reconciliation", "final reconciliation failed!");
       handleErrorState();
-    } else
+    } else {
       LOG.info("Reconciliation", "final reconciliation completed!");
+    }
   }
 
   private void handleErrorState() {
@@ -319,14 +317,15 @@ public class VerifierRepositoryImpl implements VerifierRepository {
   private void deleteAllFromDB() {
     try {
       revokedPassDao.deleteAll();
+      drlDao.deleteAll();
     } catch (Exception e) {
       LOG.error("deleteAllFromRealm", e);
     }
   }
 
   private void checkCurrentDownloadSize() {
-    List<RevokedPass> revokedPasses = revokedPassDao.findAll();
-    realmSize = revokedPasses.size();
+    long revokedPassesCount = revokedPassDao.count();
+    revokedPassesSize = (int) revokedPassesCount;
   }
 
   private void getCRLStatus() {
@@ -341,9 +340,10 @@ public class VerifierRepositoryImpl implements VerifierRepository {
       Response<CrlStatus> response = call.execute();
       if (response.isSuccessful()) {
         CrlStatus crlStatus = response.body();
-        if (response.body() != null) {
+        if (crlStatus != null) {
+          saveCrlStatusInfo(crlStatus);
+
           if (outDatedVersion(crlStatus)) {
-            saveCrlStatusInfo(crlStatus);
             downloadChunks(crlStatus);
           } else {
             manageFinalReconciliation();
@@ -370,6 +370,7 @@ public class VerifierRepositoryImpl implements VerifierRepository {
 
       while (noMoreChunks(crlStatus)) {
         try {
+          LOG.info("downloadChunks: {}", preferences.getCurrentChunk() + 1);
           Call<CertificateRevocationList> call = apiServiceClient.getApiCertificate()
               .getRevokeList(preferences.getCurrentVersion(), preferences.getCurrentChunk() + 1);
 
@@ -397,19 +398,23 @@ public class VerifierRepositoryImpl implements VerifierRepository {
 
       if (isDownloadComplete(crlStatus)) {
 
-        saveDrlStatusInDB(crlStatus);
-
         preferences.setCurrentVersion(preferences.getRequestedVersion());
         preferences.setCurrentChunk(0);
         preferences.setTotalChunk(0);
+
+        saveDrlStatusInDB(crlStatus);
         getCRLStatus();
+
         LOG.info("DownloadChunks: Last chunk processed, versions updated.");
       }
     }
   }
 
   private void saveDrlStatusInDB(CrlStatus crlStatus) {
-    Drl drl = new Drl(crlStatus.getId(), crlStatus.getVersion(), crlStatus.getTotalChunk());
+    // delete old drl
+    drlDao.deleteAll();
+    // persist new drl
+    Drl drl = new Drl(crlStatus.getId(), crlStatus.getVersion());
     drlDao.save(drl);
   }
 
