@@ -10,6 +10,11 @@ public enum ValidationScanMode {
   /**
    * (BASE)
    */
-  NORMAL_DGP
+  NORMAL_DGP,
+  
+  /**
+   * (DOSE BOOSTER)
+   */
+  BOOSTER_DGP
 
 }

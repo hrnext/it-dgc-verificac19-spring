@@ -2,6 +2,7 @@ package it.dgc.verificac19.rest;
 
 import java.io.IOException;
 import java.time.LocalDate;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
 import it.dgc.verificac19.data.local.Preferences;
 import it.dgc.verificac19.model.CertificateSimple;
 import it.dgc.verificac19.model.ValidationScanMode;
@@ -31,39 +33,45 @@ public class VerifierRestApi {
 
   @RequestMapping(value = "/verify-string", method = RequestMethod.GET)
   public ResponseEntity<CertificateSimple> verifyByString(
-      @RequestParam(name = "qrCodeTxt", required = true) String qrCodeTxt) {
+      @RequestParam(name = "qrCodeTxt", required = true) String qrCodeTxt,
+      @RequestParam(name = "scanMode", required = false) ValidationScanMode inputScanMode) {
 
     if (preferences.getDateLastFetch() == null
         || !preferences.getDateLastFetch().toLocalDate().isEqual(LocalDate.now())) {
       LOG.info("Not updated");
       return ResponseEntity.ok().build();
     } else {
-      CertificateSimple certificateSimple = verifierService.verify(qrCodeTxt, ValidationScanMode.NORMAL_DGP);
+    final ValidationScanMode actualScanMode = inputScanMode == null ? ValidationScanMode.NORMAL_DGP : inputScanMode;
+    	
+    CertificateSimple certificateSimple = verifierService.verify(qrCodeTxt, actualScanMode);
 
-      switch (certificateSimple.getCertificateStatus()) {
-        case NOT_EU_DCC:
-        case NOT_VALID:
-        case NOT_VALID_YET:
-          LOG.info("Invalid");
-          break;
-        case VALID:
-          LOG.info("Valid");
-          break;
-      }
-      return ResponseEntity.ok(certificateSimple);
+    switch (certificateSimple.getCertificateStatus()) {
+      case NOT_EU_DCC:
+      case NOT_VALID:
+      case NOT_VALID_YET:
+        LOG.info("Invalid");
+        break;
+      case VALID:
+        LOG.info("Valid");
+        break;
+    }
+    return ResponseEntity.ok(certificateSimple);
     }
   }
 
   @RequestMapping(value = "/verify-image", method = RequestMethod.POST)
-  public ResponseEntity<CertificateSimple> verifyByImage(@RequestPart(name = "file", required = true) MultipartFile file) {
+  public ResponseEntity<CertificateSimple> verifyByImage(@RequestPart(name = "file", required = true) MultipartFile file, 
+		  @RequestParam(name = "scanMode", required = true) ValidationScanMode inputScanMode) {
     if (preferences.getDateLastFetch() == null
         || !preferences.getDateLastFetch().toLocalDate().isEqual(LocalDate.now())) {
       LOG.info("Not updated");
       return ResponseEntity.ok().build();
     } else {
+      final ValidationScanMode actualScanMode = inputScanMode == null ? ValidationScanMode.NORMAL_DGP : inputScanMode;
+
       CertificateSimple certificateSimple;
       try {
-        certificateSimple = verifierService.verify(file.getBytes(), ValidationScanMode.NORMAL_DGP);
+        certificateSimple = verifierService.verify(file.getBytes(), actualScanMode);
       } catch (IOException e) {
         LOG.error("Error on decode image", e);
         return ResponseEntity.internalServerError().build();

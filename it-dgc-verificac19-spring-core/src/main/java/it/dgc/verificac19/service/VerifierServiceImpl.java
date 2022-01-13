@@ -109,22 +109,27 @@ public class VerifierServiceImpl implements VerifierService {
 
     CertificateSimple certificateSimple = new CertificateSimple();
 
-    String certificateIdentifier = extractUVCI(digitalCovidCertificate);
-
-    if (isCertificateRevoked(Utility.sha256(certificateIdentifier))) {
-      certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
-    } else {
-      if (Strings.isNullOrEmpty(certificateIdentifier)) {
-        certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
-      } else if (verifierRepository.checkInBlackList(certificateIdentifier)) {
-        certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
-      } else if (validationScanMode == ValidationScanMode.SUPER_DGP
-          && digitalCovidCertificate.getT() != null) {
-        certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
-      } else {
-        certificateSimple.setCertificateStatus(getCertificateStatus(digitalCovidCertificate));
-      }
-    }
+    final String certificateIdentifier = extractUVCI(digitalCovidCertificate);
+	if (Strings.isNullOrEmpty(certificateIdentifier) || isCertificateRevoked(Utility.sha256(certificateIdentifier))
+			|| verifierRepository.checkInBlackList(certificateIdentifier)) {
+		certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
+	} else {
+		if (validationScanMode == ValidationScanMode.SUPER_DGP && digitalCovidCertificate.getT() != null) {
+			certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
+		} else if (validationScanMode == ValidationScanMode.BOOSTER_DGP) {
+			CertificateStatus tempStatus = getCertificateStatus(digitalCovidCertificate);
+			if(tempStatus == CertificateStatus.VALID) {
+				if(checkBoosterDCG(digitalCovidCertificate)) {
+					tempStatus = CertificateStatus.VALID;
+				} else {
+					tempStatus = CertificateStatus.TEST_NEEDED;
+				}
+			} 
+			certificateSimple.setCertificateStatus(tempStatus);
+		} else {
+	        certificateSimple.setCertificateStatus(getCertificateStatus(digitalCovidCertificate));
+		}
+	}
 
     certificateSimple.setPerson(new SimplePersonModel(digitalCovidCertificate.getNam().getFnt(),
         digitalCovidCertificate.getNam().getFn(), digitalCovidCertificate.getNam().getGnt(),
@@ -154,6 +159,30 @@ public class VerifierServiceImpl implements VerifierService {
 
     return CertificateStatus.NOT_VALID;
   }
+  
+  	/**
+	* This method check if DCG is a valid booster certificate and return true/false accordingly
+	* Cases are taken from https://github.com/ministero-salute/it-dgc-verificac19-sdk-android/pull/93#issuecomment-1001822186
+	*/
+	private boolean checkBoosterDCG(DigitalCovidCertificate digitalCovidCertificate) {
+		if(!CollectionUtils.isEmpty(digitalCovidCertificate.getV())) {
+			VaccinationEntry lastVaccination = Iterables.getLast(digitalCovidCertificate.getV());
+			Integer dn = lastVaccination.getDn();
+			Integer sd = lastVaccination.getSd();
+			final boolean isJohnson = lastVaccination.getMp().equals("EU/1/20/1525");
+			if(Integer.valueOf(3).equals(dn)) {
+				return true;
+			}
+			if(Integer.valueOf(2).equals(dn)) {
+				if(Integer.valueOf(1).equals(sd)) {
+					return true;
+				} else if(Integer.valueOf(2).equals(sd)) {
+					return isJohnson;
+				}
+			}
+		}
+		return false;
+	}
 
   /**
    *
