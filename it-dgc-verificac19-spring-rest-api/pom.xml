@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>it.dgc</groupId>
 	<artifactId>it-dgc-verificac19-spring-rest-api</artifactId>
-	<version>0.0.3</version>
+	<version>0.1.0</version>
 	<name>it-dgc-verificac19-spring-rest-api</name>
 	<description>dgc Verifier REST API</description>
 	<properties>
@@ -25,7 +25,7 @@
 		<dependency>
 			<groupId>it.dgc</groupId>
 			<artifactId>it-dgc-verificac19-spring-core</artifactId>
-			<version>${project.version}</version>
+			<version>0.0.3</version>
 		</dependency>
 
 		<dependency>
