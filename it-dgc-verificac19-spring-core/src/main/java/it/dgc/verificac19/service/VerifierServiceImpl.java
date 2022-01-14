@@ -11,9 +11,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
 import javax.annotation.PostConstruct;
-
 import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,12 +19,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-
 import it.dgc.verificac19.data.VerifierRepository;
+import it.dgc.verificac19.data.local.MedicinalProduct;
 import it.dgc.verificac19.data.local.Preferences;
 import it.dgc.verificac19.model.CertificateSimple;
 import it.dgc.verificac19.model.CertificateSimple.SimplePersonModel;
@@ -110,26 +107,11 @@ public class VerifierServiceImpl implements VerifierService {
     CertificateSimple certificateSimple = new CertificateSimple();
 
     final String certificateIdentifier = extractUVCI(digitalCovidCertificate);
-	if (Strings.isNullOrEmpty(certificateIdentifier) || isCertificateRevoked(Utility.sha256(certificateIdentifier))
-			|| verifierRepository.checkInBlackList(certificateIdentifier)) {
-		certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
-	} else {
-		if (validationScanMode == ValidationScanMode.SUPER_DGP && digitalCovidCertificate.getT() != null) {
-			certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
-		} else if (validationScanMode == ValidationScanMode.BOOSTER_DGP) {
-			CertificateStatus tempStatus = getCertificateStatus(digitalCovidCertificate);
-			if(tempStatus == CertificateStatus.VALID) {
-				if(checkBoosterDCG(digitalCovidCertificate)) {
-					tempStatus = CertificateStatus.VALID;
-				} else {
-					tempStatus = CertificateStatus.TEST_NEEDED;
-				}
-			} 
-			certificateSimple.setCertificateStatus(tempStatus);
-		} else {
-	        certificateSimple.setCertificateStatus(getCertificateStatus(digitalCovidCertificate));
-		}
-	}
+
+    certificateSimple.setCertificateStatus(
+        getCertificateStatus(digitalCovidCertificate, validationScanMode, certificateIdentifier));
+
+
 
     certificateSimple.setPerson(new SimplePersonModel(digitalCovidCertificate.getNam().getFnt(),
         digitalCovidCertificate.getNam().getFn(), digitalCovidCertificate.getNam().getGnt(),
@@ -145,52 +127,59 @@ public class VerifierServiceImpl implements VerifierService {
    *
    * This method checks the given [DigitalCovidCertificate] and returns the proper status as
    * [CertificateStatus].
+   * 
+   * @param validationScanMode
+   * @param certificateIdentifier
+   * @throws NoSuchAlgorithmException
    *
    */
-  private CertificateStatus getCertificateStatus(DigitalCovidCertificate cert) {
+  private CertificateStatus getCertificateStatus(DigitalCovidCertificate cert,
+      ValidationScanMode validationScanMode, String certificateIdentifier)
+      throws NoSuchAlgorithmException {
+
+    if (isCertificateRevoked(Utility.sha256(certificateIdentifier))) {
+      return CertificateStatus.REVOKED;
+    }
+
+    if (Strings.isNullOrEmpty(certificateIdentifier)) {
+      return CertificateStatus.NOT_EU_DCC;
+    }
+
+    if (verifierRepository.checkInBlackList(certificateIdentifier)) {
+      return CertificateStatus.NOT_VALID;
+    }
 
     if (!CollectionUtils.isEmpty(cert.getR())) {
-      return checkRecoveryStatements(cert.getR());
-    } else if (!CollectionUtils.isEmpty(cert.getT())) {
+      return checkRecoveryStatements(cert.getR(), validationScanMode);
+    }
+
+
+    if (!CollectionUtils.isEmpty(cert.getT())) {
+      if (validationScanMode.equals(ValidationScanMode.BOOSTER_DGP)
+          || validationScanMode.equals(ValidationScanMode.SUPER_DGP)) {
+        return CertificateStatus.NOT_VALID;
+      }
+
       return checkTests(cert.getT());
-    } else if (!CollectionUtils.isEmpty(cert.getV())) {
-      return checkVaccinations(cert.getV());
+    }
+
+    if (!CollectionUtils.isEmpty(cert.getV())) {
+      return checkVaccinations(cert.getV(), validationScanMode);
     }
 
     return CertificateStatus.NOT_VALID;
   }
-  
-  	/**
-	* This method check if DCG is a valid booster certificate and return true/false accordingly
-	* Cases are taken from https://github.com/ministero-salute/it-dgc-verificac19-sdk-android/pull/93#issuecomment-1001822186
-	*/
-	private boolean checkBoosterDCG(DigitalCovidCertificate digitalCovidCertificate) {
-		if(!CollectionUtils.isEmpty(digitalCovidCertificate.getV())) {
-			VaccinationEntry lastVaccination = Iterables.getLast(digitalCovidCertificate.getV());
-			Integer dn = lastVaccination.getDn();
-			Integer sd = lastVaccination.getSd();
-			final boolean isJohnson = lastVaccination.getMp().equals("EU/1/20/1525");
-			if(Integer.valueOf(3).equals(dn)) {
-				return true;
-			}
-			if(Integer.valueOf(2).equals(dn)) {
-				if(Integer.valueOf(1).equals(sd)) {
-					return true;
-				} else if(Integer.valueOf(2).equals(sd)) {
-					return isJohnson;
-				}
-			}
-		}
-		return false;
-	}
 
   /**
    *
    * This method checks the given recovery statements passed as a [List] of [RecoveryModel] and
    * returns the proper status as [CertificateStatus].
+   * 
+   * @param validationScanMode
    *
    */
-  private CertificateStatus checkRecoveryStatements(List<RecoveryEntry> list) {
+  private CertificateStatus checkRecoveryStatements(List<RecoveryEntry> list,
+      ValidationScanMode validationScanMode) {
     try {
 
       RecoveryEntry lastRecovery = Iterables.getLast(list);
@@ -208,7 +197,12 @@ public class VerifierServiceImpl implements VerifierService {
       } else if (LocalDate.now().isAfter(endDate)) {
         return CertificateStatus.VALID;
       } else {
-        return CertificateStatus.VALID;
+        if (validationScanMode.equals(ValidationScanMode.BOOSTER_DGP)) {
+          return CertificateStatus.TEST_NEEDED;
+        } else {
+          return CertificateStatus.VALID;
+        }
+
       }
 
     } catch (Exception e) {
@@ -220,9 +214,12 @@ public class VerifierServiceImpl implements VerifierService {
    *
    * This method checks the given vaccinations passed as a [List] of [VaccinationModel] and returns
    * the proper status as [CertificateStatus].
+   * 
+   * @param validationScanMode
    *
    */
-  private CertificateStatus checkVaccinations(List<VaccinationEntry> list) {
+  private CertificateStatus checkVaccinations(List<VaccinationEntry> list,
+      ValidationScanMode validationScanMode) {
 
     VaccinationEntry lastVaccination = Iterables.getLast(list);
 
@@ -263,10 +260,12 @@ public class VerifierServiceImpl implements VerifierService {
         LocalDate startDate = null;
         LocalDate endDate = null;
 
-        // j&j booster
-        if (lastVaccination.getMp().equals("EU/1/20/1525")
-            && (lastVaccination.getDn() > lastVaccination.getSd())) {
+        if (lastVaccination.getMp().equals(MedicinalProduct.JOHNSON)
+            && ((lastVaccination.getDn() > lastVaccination.getSd())
+                || (lastVaccination.getDn() == lastVaccination.getSd()
+                    && lastVaccination.getDn() >= 2))) {
           startDate = lastVaccination.getDt();
+
           endDate = lastVaccination.getDt()
               .plusDays(Long.valueOf(getVaccineEndDayComplete(lastVaccination.getMp())));
         } else {
@@ -275,15 +274,28 @@ public class VerifierServiceImpl implements VerifierService {
           endDate = lastVaccination.getDt()
               .plusDays(Long.valueOf(getVaccineEndDayComplete(lastVaccination.getMp())));
         }
-
         LOG.debug("dates start:{} end: {}", startDate, endDate);
 
         if (startDate.isAfter(LocalDate.now())) {
           return CertificateStatus.NOT_VALID_YET;
-        } else if (LocalDate.now().isAfter(endDate)) {
+        }
+        if (LocalDate.now().isAfter(endDate)) {
           return CertificateStatus.NOT_VALID;
         } else {
-          return CertificateStatus.VALID;
+
+          if (validationScanMode == ValidationScanMode.BOOSTER_DGP) {
+            if (lastVaccination.getMp().equals(MedicinalProduct.JOHNSON)) {
+              if (lastVaccination.getDn() == lastVaccination.getSd() && lastVaccination.getDn() < 2)
+                return CertificateStatus.TEST_NEEDED;
+            } else {
+              if ((lastVaccination.getDn() == lastVaccination.getSd()
+                  && lastVaccination.getDn() < 3))
+                return CertificateStatus.TEST_NEEDED;
+            }
+            return CertificateStatus.VALID;
+          } else {
+            return CertificateStatus.VALID;
+          }
         }
 
       } else {
