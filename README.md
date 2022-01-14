@@ -62,7 +62,10 @@ persona, la data di nascita, il timestamp di verifica e lo stato della
 verifica. 
 
 Tipologia base (NORMAL_DGP): l'sdk considera valide le certificazioni verdi generate da vaccinazione, da guarigione, da tampone.
+
 Tipologia rafforzata (SUPER_DGP): l'sdk considera valide solo le certificazioni verdi generate da vaccinazione o da guarigione.
+
+Tipologia booster (BOOSTER_DGP): l'sdk considera valide solo le certificazioni verdi rilasciate a seguito della somministrazione di una dose di richiamo (booster) e quelle rilasciate al completamento del ciclo vaccinale, richiedendo per queste ultime una ulteriore validazione di un tampone).
 
 Basandosi su questi dati &egrave; possibile disegnare la UI e fornire all'operatore lo
 stato della verifica del DGC.
