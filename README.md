@@ -5,6 +5,7 @@
 # Indice
 - [Contesto](#contesto)
 - [Installazione](#installazione)
+- [Aggiornamenti](#aggiornamenti)
 - [Uso](#uso)
 - [Licenza](#licenza)
   - [Dettaglio licenza](#dettaglio-licenza)
@@ -37,6 +38,55 @@ Il codice sorgente è suddiviso nei due seguenti moduli maven.
 2. **it-dgc-verificac19-spring-rest-api** è una applicazione Spring Boot che funge da POC dell'estensione Java Spring.
 
 ###   
+
+# Aggiornamenti
+L'aggiornamento dei dati: regole di validazione, certificati di firma e DGC revocati avviene mediante un cron schedulato quotidianamente
+
+```
+  @Retryable(maxAttempts = Integer.MAX_VALUE)
+  @Scheduled(cron = "@daily")
+  public void doWork() {
+    LOG.info("key fetching start");
+    boolean res = verifierRepository.syncData();
+    LOG.info("key fetching result: {}", res);
+    if (!res) {
+      throw new RuntimeException("Error on sync data, retry");
+    }
+  }
+  
+  @Override
+  public boolean syncData() {
+    try {
+      if (fetchValidationRules() == false || fetchCertificates() == false) {
+        return false;
+      }
+    } catch (IOException | RuntimeException e) {
+      LOG.error("Fetch validation rules / certificates error", e);
+      return false;
+    }
+
+    if (preferences.isDrlSyncActive()) {
+      getCRLStatus();
+    }
+
+    preferences.setDateLastFetch(LocalDateTime.now());
+    return true;
+  }
+  
+  In sintesi:
+  //aggiorna le regole di validazione
+  fetchValidationRules()
+  
+  //aggiorna lo status e la lista dei certificati
+  fetchCertificates()
+  
+  //aggiorna le liste di revoca
+  getCRLStatus()
+  
+  ```
+La verifica della DRL viene implementata come uno step opzionale del processo ed è guidato da un apposito configuration item propagato tramite la Piattaforma Nazionale.
+Per ottimizzare il traffico di rete, le DRL non vengono trasferite sottoforma di SNAPSHOT complete (ad eccezione del primo avvio), tipicamente sono rappresentate da DIFF partizionate in CHUNK.
+Per garantire la corretta persistenza della DRL Revocation List sono stati introdotti controlli di congruenza per assicurare che l'esito della costruzione dell nuova DRL abbia avuto l'esito sperato.
 
 # Uso
 
