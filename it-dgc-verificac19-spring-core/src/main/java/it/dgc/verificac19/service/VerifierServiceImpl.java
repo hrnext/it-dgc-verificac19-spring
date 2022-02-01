@@ -28,18 +28,19 @@ import it.dgc.verificac19.data.local.Preferences;
 import it.dgc.verificac19.model.CertificateSimple;
 import it.dgc.verificac19.model.CertificateSimple.SimplePersonModel;
 import it.dgc.verificac19.model.CertificateStatus;
+import it.dgc.verificac19.model.CustomDefaultDGCBarcodeDecoder;
+import it.dgc.verificac19.model.CustomDefaultDGCSignatureVerifier;
+import it.dgc.verificac19.model.CustomDigitalCovidCertificate;
+import it.dgc.verificac19.model.Exemption;
 import it.dgc.verificac19.model.TestResult;
 import it.dgc.verificac19.model.TestType;
 import it.dgc.verificac19.model.ValidationRulesEnum;
 import it.dgc.verificac19.model.ValidationScanMode;
 import it.dgc.verificac19.utility.Utility;
 import se.digg.dgc.encoding.impl.DefaultBarcodeDecoder;
-import se.digg.dgc.payload.v1.DigitalCovidCertificate;
 import se.digg.dgc.payload.v1.RecoveryEntry;
 import se.digg.dgc.payload.v1.TestEntry;
 import se.digg.dgc.payload.v1.VaccinationEntry;
-import se.digg.dgc.service.DGCBarcodeDecoder;
-import se.digg.dgc.service.impl.DefaultDGCBarcodeDecoder;
 import se.digg.dgc.signatures.CertificateProvider;
 
 @Service
@@ -53,18 +54,19 @@ public class VerifierServiceImpl implements VerifierService {
   @Autowired
   Preferences preferences;
 
-  private DGCBarcodeDecoder dgcBarcodeDecoder;
+  private CustomDefaultDGCBarcodeDecoder dgcBarcodeDecoder;
 
   @PostConstruct
   public void init() {
-    this.dgcBarcodeDecoder = new DefaultDGCBarcodeDecoder(null, new CertificateProvider() {
-      @Override
-      public List<X509Certificate> getCertificates(String country, byte[] kid) {
-        String base64Kid = Base64.encodeBase64String(kid);
-        X509Certificate cert = (X509Certificate) verifierRepository.getCertificate(base64Kid);
-        return cert != null ? Arrays.asList(cert) : Lists.newArrayList();
-      }
-    }, new DefaultBarcodeDecoder());
+    this.dgcBarcodeDecoder = new CustomDefaultDGCBarcodeDecoder(
+        new CustomDefaultDGCSignatureVerifier(), new CertificateProvider() {
+          @Override
+          public List<X509Certificate> getCertificates(String country, byte[] kid) {
+            String base64Kid = Base64.encodeBase64String(kid);
+            X509Certificate cert = (X509Certificate) verifierRepository.getCertificate(base64Kid);
+            return cert != null ? Arrays.asList(cert) : Lists.newArrayList();
+          }
+        }, new DefaultBarcodeDecoder());
 
   }
 
@@ -73,7 +75,8 @@ public class VerifierServiceImpl implements VerifierService {
 
     try {
 
-      DigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decodeBarcode(qrCodeImg);
+      CustomDigitalCovidCertificate digitalCovidCertificate =
+          dgcBarcodeDecoder.decodeBarcode(qrCodeImg);
 
       return validate(digitalCovidCertificate, validationScanMode);
 
@@ -90,7 +93,7 @@ public class VerifierServiceImpl implements VerifierService {
 
     try {
 
-      DigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decode(qrCodeTxt);
+      CustomDigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decode(qrCodeTxt);
 
       return validate(digitalCovidCertificate, validationScanMode);
 
@@ -101,7 +104,7 @@ public class VerifierServiceImpl implements VerifierService {
     }
   }
 
-  private CertificateSimple validate(DigitalCovidCertificate digitalCovidCertificate,
+  private CertificateSimple validate(CustomDigitalCovidCertificate digitalCovidCertificate,
       ValidationScanMode validationScanMode) throws NoSuchAlgorithmException {
 
     CertificateSimple certificateSimple = new CertificateSimple();
@@ -110,8 +113,6 @@ public class VerifierServiceImpl implements VerifierService {
 
     certificateSimple.setCertificateStatus(
         getCertificateStatus(digitalCovidCertificate, validationScanMode, certificateIdentifier));
-
-
 
     certificateSimple.setPerson(new SimplePersonModel(digitalCovidCertificate.getNam().getFnt(),
         digitalCovidCertificate.getNam().getFn(), digitalCovidCertificate.getNam().getGnt(),
@@ -133,7 +134,7 @@ public class VerifierServiceImpl implements VerifierService {
    * @throws NoSuchAlgorithmException
    *
    */
-  private CertificateStatus getCertificateStatus(DigitalCovidCertificate cert,
+  private CertificateStatus getCertificateStatus(CustomDigitalCovidCertificate cert,
       ValidationScanMode validationScanMode, String certificateIdentifier)
       throws NoSuchAlgorithmException {
 
@@ -167,7 +168,53 @@ public class VerifierServiceImpl implements VerifierService {
       return checkVaccinations(cert.getV(), validationScanMode);
     }
 
+    if (!CollectionUtils.isEmpty(cert.getE())) {
+      return checkExemptions(cert.getE(), validationScanMode);
+    }
+
+
     return CertificateStatus.NOT_VALID;
+  }
+
+  /**
+   * This method checks the [Exemption] and returns a proper [CertificateStatus] after checking the
+   * validity start and end dates.
+   */
+  private CertificateStatus checkExemptions(List<Exemption> list,
+      ValidationScanMode validationScanMode) {
+
+
+    try {
+
+      Exemption lastExemption = Iterables.getLast(list);
+
+      LocalDate startDate = LocalDate.parse(lastExemption.getCertificateValidFrom());
+
+      LocalDate endDate = lastExemption.getCertificateValidUntil() != null
+          ? LocalDate.parse(lastExemption.getCertificateValidUntil())
+          : null;
+
+      LOG.debug("dates start:{} end:{}", startDate, endDate);
+
+      if (startDate.isAfter(LocalDate.now())) {
+        return CertificateStatus.NOT_VALID_YET;
+      }
+
+      if (endDate != null) {
+        if (LocalDate.now().isAfter(endDate)) {
+          return CertificateStatus.NOT_VALID;
+        }
+      }
+
+      if (validationScanMode.equals(ValidationScanMode.BOOSTER_DGP)) {
+        return CertificateStatus.TEST_NEEDED;
+      } else {
+        return CertificateStatus.VALID;
+      }
+    } catch (Exception e) {
+      return CertificateStatus.NOT_EU_DCC;
+    }
+
   }
 
   /**
@@ -353,7 +400,16 @@ public class VerifierServiceImpl implements VerifierService {
     }
   }
 
-  private String extractUVCI(DigitalCovidCertificate digitalCovidCertificate) {
+  /**
+   * This method extracts the UCVI from an Exemption, Vaccine, Recovery or Test based on what was
+   * received.
+   */
+  private String extractUVCI(CustomDigitalCovidCertificate digitalCovidCertificate) {
+
+    Optional<Exemption> e = Optional.ofNullable(digitalCovidCertificate.getE())
+        .orElseGet(Collections::emptyList).stream().findFirst();
+    if (e.isPresent())
+      return e.get().getCertificateIdentifier();
 
     Optional<VaccinationEntry> v = Optional.ofNullable(digitalCovidCertificate.getV())
         .orElseGet(Collections::emptyList).stream().findFirst();
