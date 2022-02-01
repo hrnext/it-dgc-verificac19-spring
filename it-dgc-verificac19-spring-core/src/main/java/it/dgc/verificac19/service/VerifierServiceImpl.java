@@ -3,12 +3,14 @@ package it.dgc.verificac19.service;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
 import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import javax.annotation.PostConstruct;
@@ -25,9 +27,11 @@ import com.google.common.collect.Lists;
 import it.dgc.verificac19.data.VerifierRepository;
 import it.dgc.verificac19.data.local.MedicinalProduct;
 import it.dgc.verificac19.data.local.Preferences;
+import it.dgc.verificac19.model.CertCode;
 import it.dgc.verificac19.model.CertificateSimple;
 import it.dgc.verificac19.model.CertificateSimple.SimplePersonModel;
 import it.dgc.verificac19.model.CertificateStatus;
+import it.dgc.verificac19.model.Country;
 import it.dgc.verificac19.model.CustomDefaultDGCBarcodeDecoder;
 import it.dgc.verificac19.model.CustomDefaultDGCSignatureVerifier;
 import it.dgc.verificac19.model.CustomDigitalCovidCertificate;
@@ -56,6 +60,8 @@ public class VerifierServiceImpl implements VerifierService {
 
   private CustomDefaultDGCBarcodeDecoder dgcBarcodeDecoder;
 
+  private X509Certificate cert;
+
   @PostConstruct
   public void init() {
     this.dgcBarcodeDecoder = new CustomDefaultDGCBarcodeDecoder(
@@ -63,7 +69,7 @@ public class VerifierServiceImpl implements VerifierService {
           @Override
           public List<X509Certificate> getCertificates(String country, byte[] kid) {
             String base64Kid = Base64.encodeBase64String(kid);
-            X509Certificate cert = (X509Certificate) verifierRepository.getCertificate(base64Kid);
+            cert = (X509Certificate) verifierRepository.getCertificate(base64Kid);
             return cert != null ? Arrays.asList(cert) : Lists.newArrayList();
           }
         }, new DefaultBarcodeDecoder());
@@ -229,20 +235,25 @@ public class VerifierServiceImpl implements VerifierService {
       ValidationScanMode validationScanMode) {
     try {
 
+      boolean isRecoveryBis = isRecoveryBis(list, validationScanMode);
+
+      String recoveryCertEndDay =
+          isRecoveryBis ? getRecoveryCertPvEndDay() : getRecoveryCertEndDay();
+      String recoveryCertStartDay =
+          isRecoveryBis ? getRecoveryCertPVStartDay() : getRecoveryCertStartDay();
+
       RecoveryEntry lastRecovery = Iterables.getLast(list);
 
-      LocalDate startDate = lastRecovery.getDf().plusDays(Long.valueOf(getRecoveryCertStartDay()));
+      LocalDate startDate = lastRecovery.getDf();
       LocalDate endDate = lastRecovery.getDu();
 
       LOG.debug("dates start:{} end:{}", startDate, endDate);
 
-      if (startDate.isAfter(LocalDate.now())) {
+
+      if ((startDate.plusDays(Long.valueOf(recoveryCertStartDay)).isAfter(LocalDate.now()))) {
         return CertificateStatus.NOT_VALID_YET;
-      } else if (LocalDate.now()
-          .isAfter(startDate.plusDays(Long.valueOf(getRecoveryCertEndDay())))) {
+      } else if (LocalDate.now().isAfter(startDate.plusDays(Long.valueOf(recoveryCertEndDay)))) {
         return CertificateStatus.NOT_VALID;
-      } else if (LocalDate.now().isAfter(endDate)) {
-        return CertificateStatus.VALID;
       } else {
         if (validationScanMode.equals(ValidationScanMode.BOOSTER_DGP)) {
           return CertificateStatus.TEST_NEEDED;
@@ -255,6 +266,26 @@ public class VerifierServiceImpl implements VerifierService {
     } catch (Exception e) {
       return CertificateStatus.NOT_VALID;
     }
+  }
+
+  private boolean isRecoveryBis(List<RecoveryEntry> list, ValidationScanMode validationScanMode)
+      throws CertificateParsingException {
+
+    RecoveryEntry firstRecovery = Iterables.getFirst(list, null);
+    if (firstRecovery != null && Country.IT.getValue().equals(firstRecovery.getCo())) {
+      List<String> keysUsage = cert.getExtendedKeyUsage();
+      Iterator<String> it = keysUsage.iterator();
+      while (it.hasNext()) {
+        String keyUsage = it.next();
+        if (CertCode.OID_RECOVERY.getValue().equals(keyUsage)
+            || CertCode.OID_ALT_RECOVERY.getValue().equals(keyUsage)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+
   }
 
   /**
@@ -433,8 +464,16 @@ public class VerifierServiceImpl implements VerifierService {
     return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_START_DAY);
   }
 
+  private String getRecoveryCertPVStartDay() {
+    return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_PV_START_DAY);
+  }
+
   private String getRecoveryCertEndDay() {
     return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_END_DAY);
+  }
+
+  private String getRecoveryCertPvEndDay() {
+    return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_PV_END_DAY);
   }
 
   private String getMolecularTestStartHour() {

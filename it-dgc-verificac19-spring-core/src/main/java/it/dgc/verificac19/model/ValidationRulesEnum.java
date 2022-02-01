@@ -19,6 +19,12 @@ public enum ValidationRulesEnum {
   @SerializedName(value = "recovery_cert_start_day")
   RECOVERY_CERT_START_DAY("recovery_cert_start_day"),
 
+  @SerializedName(value = "recovery_cert_pv_start_day")
+  RECOVERY_CERT_PV_START_DAY("recovery_cert_pv_start_day"),
+
+  @SerializedName(value = "recovery_pv_cert_end_day")
+  RECOVERY_CERT_PV_END_DAY("recovery_pv_cert_end_day"),
+
   @SerializedName(value = "recovery_cert_end_day")
   RECOVERY_CERT_END_DAY("recovery_cert_end_day"),
 
