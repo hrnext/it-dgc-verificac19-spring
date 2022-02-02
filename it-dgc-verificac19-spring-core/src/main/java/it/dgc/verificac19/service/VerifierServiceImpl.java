@@ -1,8 +1,8 @@
 package it.dgc.verificac19.service;
 
+import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
-import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
@@ -27,14 +27,16 @@ import com.google.common.collect.Lists;
 import it.dgc.verificac19.data.VerifierRepository;
 import it.dgc.verificac19.data.local.MedicinalProduct;
 import it.dgc.verificac19.data.local.Preferences;
+import it.dgc.verificac19.exception.VerificaC19CertificateExpiredDGCException;
+import it.dgc.verificac19.exception.VerificaC19SignatureDGCException;
 import it.dgc.verificac19.model.CertCode;
 import it.dgc.verificac19.model.CertificateSimple;
 import it.dgc.verificac19.model.CertificateSimple.SimplePersonModel;
 import it.dgc.verificac19.model.CertificateStatus;
 import it.dgc.verificac19.model.Country;
-import it.dgc.verificac19.model.CustomDefaultDGCBarcodeDecoder;
-import it.dgc.verificac19.model.CustomDefaultDGCSignatureVerifier;
-import it.dgc.verificac19.model.CustomDigitalCovidCertificate;
+import it.dgc.verificac19.model.VerificaC19DefaultDGCBarcodeDecoder;
+import it.dgc.verificac19.model.VerificaC19DefaultDGCSignatureVerifier;
+import it.dgc.verificac19.model.VerificaC19DigitalCovidCertificate;
 import it.dgc.verificac19.model.Exemption;
 import it.dgc.verificac19.model.TestResult;
 import it.dgc.verificac19.model.TestType;
@@ -58,14 +60,14 @@ public class VerifierServiceImpl implements VerifierService {
   @Autowired
   Preferences preferences;
 
-  private CustomDefaultDGCBarcodeDecoder dgcBarcodeDecoder;
+  private VerificaC19DefaultDGCBarcodeDecoder dgcBarcodeDecoder;
 
   private X509Certificate cert;
 
   @PostConstruct
   public void init() {
-    this.dgcBarcodeDecoder = new CustomDefaultDGCBarcodeDecoder(
-        new CustomDefaultDGCSignatureVerifier(), new CertificateProvider() {
+    this.dgcBarcodeDecoder = new VerificaC19DefaultDGCBarcodeDecoder(
+        new VerificaC19DefaultDGCSignatureVerifier(), new CertificateProvider() {
           @Override
           public List<X509Certificate> getCertificates(String country, byte[] kid) {
             String base64Kid = Base64.encodeBase64String(kid);
@@ -81,36 +83,78 @@ public class VerifierServiceImpl implements VerifierService {
 
     try {
 
-      CustomDigitalCovidCertificate digitalCovidCertificate =
+      VerificaC19DigitalCovidCertificate digitalCovidCertificate =
           dgcBarcodeDecoder.decodeBarcode(qrCodeImg);
 
       return validate(digitalCovidCertificate, validationScanMode);
 
-    } catch (CertificateExpiredException | SignatureException e) {
-      return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
-    } catch (Exception e) {
+    } catch (VerificaC19CertificateExpiredDGCException e) {
+
+      LOG.trace(e.getMessage());
+
+      // CBOR encoding of a DGC v1 payload
+      byte[] cBor = e.getCbor();
+
+      return invalidateCertificate(cBor);
+
+    } catch (VerificaC19SignatureDGCException e) {
+
+      LOG.trace(e.getMessage());
+
+      // CBOR encoding of a DGC v1 payload
+      byte[] cBor = e.getCbor();
+
+      return invalidateCertificate(cBor);
+
+    } catch (SignatureException e) {
+      LOG.trace(e.getMessage());
       return new CertificateSimple(CertificateStatus.NOT_VALID);
+    } catch (Exception e) {
+      LOG.trace(e.getMessage());
+      return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
     }
 
   }
+
 
   @Override
   public CertificateSimple verify(String qrCodeTxt, ValidationScanMode validationScanMode) {
 
     try {
 
-      CustomDigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decode(qrCodeTxt);
+      VerificaC19DigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decode(qrCodeTxt);
 
       return validate(digitalCovidCertificate, validationScanMode);
 
-    } catch (CertificateExpiredException | SignatureException e) {
-      return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
-    } catch (Exception e) {
+    } catch (VerificaC19CertificateExpiredDGCException e) {
+
+      LOG.trace(e.getMessage());
+
+      // CBOR encoding of a DGC v1 payload
+      byte[] cBor = e.getCbor();
+
+      return invalidateCertificate(cBor);
+
+    } catch (VerificaC19SignatureDGCException e) {
+
+      LOG.trace(e.getMessage());
+
+      // CBOR encoding of a DGC v1 payload
+      byte[] cBor = e.getCbor();
+
+      return invalidateCertificate(cBor);
+
+    } catch (SignatureException e) {
+      LOG.trace(e.getMessage());
       return new CertificateSimple(CertificateStatus.NOT_VALID);
+    } catch (Exception e) {
+      LOG.trace(e.getMessage());
+      return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
     }
+
   }
 
-  private CertificateSimple validate(CustomDigitalCovidCertificate digitalCovidCertificate,
+  private CertificateSimple validate(VerificaC19DigitalCovidCertificate digitalCovidCertificate,
       ValidationScanMode validationScanMode) throws NoSuchAlgorithmException {
 
     CertificateSimple certificateSimple = new CertificateSimple();
@@ -130,6 +174,24 @@ public class VerifierServiceImpl implements VerifierService {
     return certificateSimple;
   }
 
+  private CertificateSimple invalidateCertificate(byte[] cBor) {
+    CertificateSimple certificateSimple = new CertificateSimple();
+
+    certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
+    try {
+      VerificaC19DigitalCovidCertificate digitalCovidCertificate = VerificaC19DigitalCovidCertificate
+          .getCBORMapper().readValue(cBor, VerificaC19DigitalCovidCertificate.class);
+      certificateSimple.setPerson(new SimplePersonModel(digitalCovidCertificate.getNam().getFnt(),
+          digitalCovidCertificate.getNam().getFn(), digitalCovidCertificate.getNam().getGnt(),
+          digitalCovidCertificate.getNam().getGn()));
+      certificateSimple.setDateOfBirth(digitalCovidCertificate.getDateOfBirth().asLocalDate());
+      certificateSimple.setTimeStamp(LocalDateTime.now());
+    } catch (IOException e1) {
+      LOG.error("Failed to decode DCC from CBOR encoding", e1);
+    }
+    return certificateSimple;
+  }
+
   /**
    *
    * This method checks the given [DigitalCovidCertificate] and returns the proper status as
@@ -140,7 +202,7 @@ public class VerifierServiceImpl implements VerifierService {
    * @throws NoSuchAlgorithmException
    *
    */
-  private CertificateStatus getCertificateStatus(CustomDigitalCovidCertificate cert,
+  private CertificateStatus getCertificateStatus(VerificaC19DigitalCovidCertificate cert,
       ValidationScanMode validationScanMode, String certificateIdentifier)
       throws NoSuchAlgorithmException {
 
@@ -435,7 +497,7 @@ public class VerifierServiceImpl implements VerifierService {
    * This method extracts the UCVI from an Exemption, Vaccine, Recovery or Test based on what was
    * received.
    */
-  private String extractUVCI(CustomDigitalCovidCertificate digitalCovidCertificate) {
+  private String extractUVCI(VerificaC19DigitalCovidCertificate digitalCovidCertificate) {
 
     Optional<Exemption> e = Optional.ofNullable(digitalCovidCertificate.getE())
         .orElseGet(Collections::emptyList).stream().findFirst();

@@ -18,16 +18,16 @@ import se.digg.dgc.payload.v1.DigitalCovidCertificate;
  *
  */
 @JsonPropertyOrder({"ver", "nam", "dob", "v", "t", "r", "e"})
-public class CustomDigitalCovidCertificate extends DigitalCovidCertificate {
+public class VerificaC19DigitalCovidCertificate extends DigitalCovidCertificate {
 
   @JsonProperty("e")
   @JsonPropertyDescription("Exemption Group")
   @Valid
   private List<Exemption> e = null;
 
-  public static CustomDigitalCovidCertificate decode(final byte[] cbor) throws DGCSchemaException {
+  public static VerificaC19DigitalCovidCertificate decode(final byte[] cbor) throws DGCSchemaException {
     try {
-      return getCBORMapper().readValue(cbor, CustomDigitalCovidCertificate.class);
+      return getCBORMapper().readValue(cbor, VerificaC19DigitalCovidCertificate.class);
     } catch (final IOException e) {
       throw new DGCSchemaException("Failed to decode DCC from CBOR encoding", e);
     }
@@ -51,7 +51,7 @@ public class CustomDigitalCovidCertificate extends DigitalCovidCertificate {
     this.e = e;
   }
 
-  public CustomDigitalCovidCertificate withE(List<Exemption> e) {
+  public VerificaC19DigitalCovidCertificate withE(List<Exemption> e) {
     this.e = e;
     return this;
   }

@@ -19,48 +19,48 @@ import se.digg.dgc.signatures.DGCSignatureVerifier;
  * @author NIGFRA
  *
  */
-public class CustomDefaultDGCBarcodeDecoder extends DefaultDGCBarcodeDecoder {
+public class VerificaC19DefaultDGCBarcodeDecoder extends DefaultDGCBarcodeDecoder {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CustomDefaultDGCBarcodeDecoder.class);
+  private static final Logger LOG = LoggerFactory.getLogger(VerificaC19DefaultDGCBarcodeDecoder.class);
 
-  public CustomDefaultDGCBarcodeDecoder(DGCSignatureVerifier dgcSignatureVerifier,
+  public VerificaC19DefaultDGCBarcodeDecoder(DGCSignatureVerifier dgcSignatureVerifier,
       CertificateProvider certificateProvider, BarcodeDecoder barcodeDecoder) {
     super(dgcSignatureVerifier, certificateProvider, barcodeDecoder);
   }
 
   @Override
-  public CustomDigitalCovidCertificate decode(String base45)
+  public VerificaC19DigitalCovidCertificate decode(String base45)
       throws DGCSchemaException, SignatureException, CertificateExpiredException, IOException {
 
     final byte[] dccEncoding = this.decodeToBytes(base45);
 
     LOG.trace("CBOR decoding DCC ...");
-    final CustomDigitalCovidCertificate dcc = CustomDigitalCovidCertificate.decode(dccEncoding);
+    final VerificaC19DigitalCovidCertificate dcc = VerificaC19DigitalCovidCertificate.decode(dccEncoding);
     LOG.trace("Decoded into: {}", dcc);
 
     return dcc;
   }
 
   @Override
-  public CustomDigitalCovidCertificate decodeRaw(byte[] cwt)
+  public VerificaC19DigitalCovidCertificate decodeRaw(byte[] cwt)
       throws DGCSchemaException, SignatureException, CertificateExpiredException, IOException {
     final byte[] encodedDcc = this.decodeRawToBytes(cwt);
 
     LOG.trace("CBOR decoding DCC ...");
-    final CustomDigitalCovidCertificate dcc = CustomDigitalCovidCertificate.decode(encodedDcc);
+    final VerificaC19DigitalCovidCertificate dcc = VerificaC19DigitalCovidCertificate.decode(encodedDcc);
     LOG.trace("Decoded into: {}", dcc);
 
     return dcc;
   }
 
   @Override
-  public CustomDigitalCovidCertificate decodeBarcode(byte[] image) throws DGCSchemaException,
+  public VerificaC19DigitalCovidCertificate decodeBarcode(byte[] image) throws DGCSchemaException,
       SignatureException, CertificateExpiredException, BarcodeException, IOException {
 
     final byte[] encodedDcc = this.decodeBarcodeToBytes(image);
 
     LOG.trace("CBOR decoding DGC ...");
-    final CustomDigitalCovidCertificate dgc = CustomDigitalCovidCertificate.decode(encodedDcc);
+    final VerificaC19DigitalCovidCertificate dgc = VerificaC19DigitalCovidCertificate.decode(encodedDcc);
     LOG.trace("Decoded into: {}", dgc);
     return dgc;
   }
