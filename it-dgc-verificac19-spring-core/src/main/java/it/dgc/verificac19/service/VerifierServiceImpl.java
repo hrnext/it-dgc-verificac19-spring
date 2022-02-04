@@ -34,14 +34,14 @@ import it.dgc.verificac19.model.CertificateSimple;
 import it.dgc.verificac19.model.CertificateSimple.SimplePersonModel;
 import it.dgc.verificac19.model.CertificateStatus;
 import it.dgc.verificac19.model.Country;
-import it.dgc.verificac19.model.VerificaC19DefaultDGCBarcodeDecoder;
-import it.dgc.verificac19.model.VerificaC19DefaultDGCSignatureVerifier;
-import it.dgc.verificac19.model.VerificaC19DigitalCovidCertificate;
 import it.dgc.verificac19.model.Exemption;
 import it.dgc.verificac19.model.TestResult;
 import it.dgc.verificac19.model.TestType;
 import it.dgc.verificac19.model.ValidationRulesEnum;
 import it.dgc.verificac19.model.ValidationScanMode;
+import it.dgc.verificac19.model.VerificaC19DefaultDGCBarcodeDecoder;
+import it.dgc.verificac19.model.VerificaC19DefaultDGCSignatureVerifier;
+import it.dgc.verificac19.model.VerificaC19DigitalCovidCertificate;
 import it.dgc.verificac19.utility.Utility;
 import se.digg.dgc.encoding.impl.DefaultBarcodeDecoder;
 import se.digg.dgc.payload.v1.RecoveryEntry;
@@ -122,7 +122,8 @@ public class VerifierServiceImpl implements VerifierService {
 
     try {
 
-      VerificaC19DigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decode(qrCodeTxt);
+      VerificaC19DigitalCovidCertificate digitalCovidCertificate =
+          dgcBarcodeDecoder.decode(qrCodeTxt);
 
       return validate(digitalCovidCertificate, validationScanMode);
 
@@ -179,8 +180,9 @@ public class VerifierServiceImpl implements VerifierService {
 
     certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
     try {
-      VerificaC19DigitalCovidCertificate digitalCovidCertificate = VerificaC19DigitalCovidCertificate
-          .getCBORMapper().readValue(cBor, VerificaC19DigitalCovidCertificate.class);
+      VerificaC19DigitalCovidCertificate digitalCovidCertificate =
+          VerificaC19DigitalCovidCertificate.getCBORMapper().readValue(cBor,
+              VerificaC19DigitalCovidCertificate.class);
       certificateSimple.setPerson(new SimplePersonModel(digitalCovidCertificate.getNam().getFnt(),
           digitalCovidCertificate.getNam().getFn(), digitalCovidCertificate.getNam().getGnt(),
           digitalCovidCertificate.getNam().getGn()));
@@ -299,12 +301,20 @@ public class VerifierServiceImpl implements VerifierService {
 
       boolean isRecoveryBis = isRecoveryBis(list, validationScanMode);
 
-      String recoveryCertEndDay =
-          isRecoveryBis ? getRecoveryCertPvEndDay() : getRecoveryCertEndDay();
-      String recoveryCertStartDay =
-          isRecoveryBis ? getRecoveryCertPVStartDay() : getRecoveryCertStartDay();
-
       RecoveryEntry lastRecovery = Iterables.getLast(list);
+
+      String countryCode =
+          validationScanMode == ValidationScanMode.NORMAL_DGP ? lastRecovery.getCo()
+              : Country.IT.getValue();
+
+
+
+      String recoveryCertEndDay =
+          isRecoveryBis ? getRecoveryCertPvEndDay() : getRecoveryCertEndDayUnified(countryCode);
+      String recoveryCertStartDay =
+          isRecoveryBis ? getRecoveryCertPVStartDay() : getRecoveryCertStartDayUnified(countryCode);
+
+
 
       LocalDate startDate = lastRecovery.getDf();
       LocalDate endDate = lastRecovery.getDu();
@@ -400,20 +410,30 @@ public class VerifierServiceImpl implements VerifierService {
         LocalDate startDate = null;
         LocalDate endDate = null;
 
-        if (lastVaccination.getMp().equals(MedicinalProduct.JOHNSON)
-            && ((lastVaccination.getDn() > lastVaccination.getSd())
-                || (lastVaccination.getDn() == lastVaccination.getSd()
-                    && lastVaccination.getDn() >= 2))) {
-          startDate = lastVaccination.getDt();
+        Long startDaysToAdd;
+        Long endDaysToAdd;
 
-          endDate = lastVaccination.getDt()
-              .plusDays(Long.valueOf(getVaccineEndDayComplete(lastVaccination.getMp())));
+        String countryCode =
+            validationScanMode == ValidationScanMode.NORMAL_DGP ? lastVaccination.getCo()
+                : Country.IT.getValue();
+
+        if (lastVaccination.getMp().equals(MedicinalProduct.JOHNSON)
+            && ((lastVaccination.getDn() >= 2))
+            || !lastVaccination.getMp().equals(MedicinalProduct.JOHNSON)
+                && ((lastVaccination.getDn() >= 3))) {
+
+          startDaysToAdd = Long.valueOf(getVaccineStartDayBoosterUnified(countryCode));
+          endDaysToAdd = Long.valueOf(getVaccineEndDayBoosterUnified(countryCode));
         } else {
-          startDate = lastVaccination.getDt()
-              .plusDays(Long.valueOf(getVaccineStartDayComplete(lastVaccination.getMp())));
-          endDate = lastVaccination.getDt()
-              .plusDays(Long.valueOf(getVaccineEndDayComplete(lastVaccination.getMp())));
+          startDaysToAdd =
+              Long.valueOf(getVaccineStartDayCompleteUnified(countryCode, lastVaccination.getMp()));
+          endDaysToAdd = Long.valueOf(getVaccineEndDayCompleteUnified(countryCode));
         }
+
+
+        startDate = lastVaccination.getDt().plusDays(startDaysToAdd);
+        endDate = lastVaccination.getDt().plusDays(endDaysToAdd);
+
         LOG.debug("dates start:{} end: {}", startDate, endDate);
 
         if (startDate.isAfter(LocalDate.now())) {
@@ -522,17 +542,17 @@ public class VerifierServiceImpl implements VerifierService {
     return "";
   }
 
-  private String getRecoveryCertStartDay() {
-    return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_START_DAY);
-  }
+  // private String getRecoveryCertStartDay() {
+  // return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_START_DAY);
+  // }
 
   private String getRecoveryCertPVStartDay() {
     return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_PV_START_DAY);
   }
 
-  private String getRecoveryCertEndDay() {
-    return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_END_DAY);
-  }
+  // private String getRecoveryCertEndDay() {
+  // return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_END_DAY);
+  // }
 
   private String getRecoveryCertPvEndDay() {
     return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_PV_END_DAY);
@@ -564,15 +584,142 @@ public class VerifierServiceImpl implements VerifierService {
         ValidationRulesEnum.VACCINE_END_DAY_NOT_COMPLETE, vaccineType);
   }
 
-  private String getVaccineStartDayComplete(String vaccineType) {
-    return preferences.getValidationRuleValueByNameAndType(
-        ValidationRulesEnum.VACCINE_START_DAY_COMPLETE, vaccineType);
-  }
+  // private String getVaccineStartDayComplete(String vaccineType) {
+  // return preferences.getValidationRuleValueByNameAndType(
+  // ValidationRulesEnum.VACCINE_START_DAY_COMPLETE, vaccineType);
+  // }
 
   private String getVaccineEndDayComplete(String vaccineType) {
     return preferences.getValidationRuleValueByNameAndType(
         ValidationRulesEnum.VACCINE_END_DAY_COMPLETE, vaccineType);
   }
+
+  private String getVaccineStartDayCompleteUnified(String countryCode, String medicalProduct) {
+    int daysToAdd = MedicinalProduct.JOHNSON.equalsIgnoreCase(medicalProduct) ? 15 : 0;
+
+    int startDay = 0;
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_START_DAY_COMPLETE_IT);
+      if (StringUtils.hasText(value)) {
+        startDay = Integer.valueOf(value);
+      }
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_START_DAY_COMPLETE_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        startDay = Integer.valueOf(value);
+      }
+    }
+
+    int valueCal = startDay + daysToAdd;
+
+    return String.valueOf(valueCal);
+
+  }
+
+  private String getVaccineEndDayCompleteUnified(String countryCode) {
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value =
+          preferences.getValidationRuleValueByName(ValidationRulesEnum.VACCINE_END_DAY_COMPLETE_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "180";
+      }
+
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_END_DAY_COMPLETE_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "270";
+      }
+    }
+  }
+
+  private String getVaccineStartDayBoosterUnified(String countryCode) {
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_START_DAY_BOOSTER_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "0";
+      }
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_START_DAY_BOOSTER_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "0";
+      }
+    }
+  }
+
+  private String getVaccineEndDayBoosterUnified(String countryCode) {
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value =
+          preferences.getValidationRuleValueByName(ValidationRulesEnum.VACCINE_END_DAY_BOOSTER_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "180";
+      }
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_END_DAY_BOOSTER_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "270";
+      }
+    }
+
+  }
+
+  private String getRecoveryCertStartDayUnified(String countryCode) {
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value =
+          preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_START_DAY_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "0";
+      }
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_START_DAY_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "0";
+      }
+    }
+  }
+
+  private String getRecoveryCertEndDayUnified(String countryCode) {
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value =
+          preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_END_DAY_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "180";
+      }
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_END_DAY_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "270";
+      }
+    }
+  }
+
 
   private boolean isCertificateRevoked(String hash) {
     if (!preferences.isDrlSyncActive()) {
