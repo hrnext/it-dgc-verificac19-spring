@@ -33,6 +33,7 @@ import it.dgc.verificac19.model.CertCode;
 import it.dgc.verificac19.model.CertificateSimple;
 import it.dgc.verificac19.model.CertificateSimple.SimplePersonModel;
 import it.dgc.verificac19.model.CertificateStatus;
+import it.dgc.verificac19.model.Const;
 import it.dgc.verificac19.model.Country;
 import it.dgc.verificac19.model.Exemption;
 import it.dgc.verificac19.model.TestResult;
@@ -232,7 +233,7 @@ public class VerifierServiceImpl implements VerifierService {
         return CertificateStatus.NOT_VALID;
       }
 
-      return checkTests(cert.getT());
+      return checkTests(cert.getT(), validationScanMode, cert.getDateOfBirth().asLocalDate());
     }
 
     if (!CollectionUtils.isEmpty(cert.getV())) {
@@ -502,9 +503,12 @@ public class VerifierServiceImpl implements VerifierService {
    *
    * This method checks the given tests passed as a [List] of [TestModel] and returns the proper
    * status as [CertificateStatus].
+   * 
+   * @param validationScanMode
    *
    */
-  private CertificateStatus checkTests(List<TestEntry> list) {
+  private CertificateStatus checkTests(List<TestEntry> list, ValidationScanMode validationScanMode,
+      LocalDate birthDate) {
 
     TestEntry lastTest = Iterables.getLast(list);
     if (lastTest.getTr() == TestResult.DETECTED.getValue()) {
@@ -537,7 +541,13 @@ public class VerifierServiceImpl implements VerifierService {
       } else if (LocalDateTime.now().isAfter(endDate)) {
         return CertificateStatus.NOT_VALID;
       } else {
-        return CertificateStatus.VALID;
+
+        if (Utility.getAge(birthDate) >= Const.VACCINE_MANDATORY_AGE
+            && ValidationScanMode.WORK.equals(validationScanMode))
+          return CertificateStatus.NOT_VALID;
+        else
+          return CertificateStatus.VALID;
+
       }
 
     } catch (Exception e) {

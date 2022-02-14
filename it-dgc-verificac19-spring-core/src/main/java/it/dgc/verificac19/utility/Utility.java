@@ -7,7 +7,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
-
+import java.time.LocalDate;
+import java.time.Period;
 import org.apache.commons.codec.binary.Base64;
 
 public class Utility {
@@ -30,5 +31,10 @@ public class Utility {
 
   private static String encodeBase64(byte[] input) {
     return Base64.encodeBase64String(input);
+  }
+
+  public static int getAge(LocalDate birthDate) {
+    LocalDate currentDate = LocalDate.now();
+    return Period.between(birthDate, currentDate).getYears();
   }
 }
