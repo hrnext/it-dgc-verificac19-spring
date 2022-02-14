@@ -80,6 +80,7 @@ public class VerifierRestApi {
       case NOT_EU_DCC:
       case NOT_VALID:
       case NOT_VALID_YET:
+      case REVOKED:
       case TEST_NEEDED:
         logger.info("Invalid");
         break;

@@ -1,7 +1,7 @@
 package it.dgc.verificac19.model;
 
 public enum ValidationScanMode {
-  
+
   /**
    * (RAFFORZATO)
    */
@@ -11,10 +11,15 @@ public enum ValidationScanMode {
    * (BASE)
    */
   NORMAL_DGP,
-  
+
   /**
    * (DOSE BOOSTER)
    */
-  BOOSTER_DGP
+  BOOSTER_DGP,
+
+  /**
+   * (SCHOOL SCAN MODE)
+   */
+  SCHOOL
 
 }
