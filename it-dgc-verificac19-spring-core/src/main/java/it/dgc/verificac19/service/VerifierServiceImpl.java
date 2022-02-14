@@ -336,9 +336,7 @@ public class VerifierServiceImpl implements VerifierService {
         } else {
           endDate = dateOfFirstPositiveTest;
         }
-      }
-
-      else {
+      } else {
         startDate.plusDays(Long.parseLong(endDaysToAdd));
       }
 
@@ -457,7 +455,11 @@ public class VerifierServiceImpl implements VerifierService {
         } else {
           startDaysToAdd =
               Long.valueOf(getVaccineStartDayCompleteUnified(countryCode, lastVaccination.getMp()));
-          endDaysToAdd = Long.valueOf(getVaccineEndDayCompleteUnified(countryCode));
+
+          if (validationScanMode.equals(ValidationScanMode.SCHOOL))
+            endDaysToAdd = Long.parseLong(getVaccineEndDaySchool());
+          else
+            endDaysToAdd = Long.parseLong(getVaccineEndDayCompleteUnified(countryCode));
         }
 
 
@@ -762,9 +764,13 @@ public class VerifierServiceImpl implements VerifierService {
   }
 
   private String getVaccineEndDaySchool() {
-    return preferences.getValidationRuleValueByName(ValidationRulesEnum.VACCINE_END_DAY_SCHOOL);
-
-
+    String value =
+        preferences.getValidationRuleValueByName(ValidationRulesEnum.VACCINE_END_DAY_SCHOOL);
+    if (StringUtils.hasText(value)) {
+      return value;
+    } else {
+      return "120";
+    }
   }
 
   private boolean isCertificateRevoked(String hash) {
