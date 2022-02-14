@@ -1,14 +1,16 @@
 package it.dgc.verificac19.service;
 
+import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
-import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import javax.annotation.PostConstruct;
@@ -25,21 +27,26 @@ import com.google.common.collect.Lists;
 import it.dgc.verificac19.data.VerifierRepository;
 import it.dgc.verificac19.data.local.MedicinalProduct;
 import it.dgc.verificac19.data.local.Preferences;
+import it.dgc.verificac19.exception.VerificaC19CertificateExpiredDGCException;
+import it.dgc.verificac19.exception.VerificaC19SignatureDGCException;
+import it.dgc.verificac19.model.CertCode;
 import it.dgc.verificac19.model.CertificateSimple;
 import it.dgc.verificac19.model.CertificateSimple.SimplePersonModel;
 import it.dgc.verificac19.model.CertificateStatus;
+import it.dgc.verificac19.model.Country;
+import it.dgc.verificac19.model.Exemption;
 import it.dgc.verificac19.model.TestResult;
 import it.dgc.verificac19.model.TestType;
 import it.dgc.verificac19.model.ValidationRulesEnum;
 import it.dgc.verificac19.model.ValidationScanMode;
+import it.dgc.verificac19.model.VerificaC19DefaultDGCBarcodeDecoder;
+import it.dgc.verificac19.model.VerificaC19DefaultDGCSignatureVerifier;
+import it.dgc.verificac19.model.VerificaC19DigitalCovidCertificate;
 import it.dgc.verificac19.utility.Utility;
 import se.digg.dgc.encoding.impl.DefaultBarcodeDecoder;
-import se.digg.dgc.payload.v1.DigitalCovidCertificate;
 import se.digg.dgc.payload.v1.RecoveryEntry;
 import se.digg.dgc.payload.v1.TestEntry;
 import se.digg.dgc.payload.v1.VaccinationEntry;
-import se.digg.dgc.service.DGCBarcodeDecoder;
-import se.digg.dgc.service.impl.DefaultDGCBarcodeDecoder;
 import se.digg.dgc.signatures.CertificateProvider;
 
 @Service
@@ -53,18 +60,21 @@ public class VerifierServiceImpl implements VerifierService {
   @Autowired
   Preferences preferences;
 
-  private DGCBarcodeDecoder dgcBarcodeDecoder;
+  private VerificaC19DefaultDGCBarcodeDecoder dgcBarcodeDecoder;
+
+  private X509Certificate cert;
 
   @PostConstruct
   public void init() {
-    this.dgcBarcodeDecoder = new DefaultDGCBarcodeDecoder(null, new CertificateProvider() {
-      @Override
-      public List<X509Certificate> getCertificates(String country, byte[] kid) {
-        String base64Kid = Base64.encodeBase64String(kid);
-        X509Certificate cert = (X509Certificate) verifierRepository.getCertificate(base64Kid);
-        return cert != null ? Arrays.asList(cert) : Lists.newArrayList();
-      }
-    }, new DefaultBarcodeDecoder());
+    this.dgcBarcodeDecoder = new VerificaC19DefaultDGCBarcodeDecoder(
+        new VerificaC19DefaultDGCSignatureVerifier(), new CertificateProvider() {
+          @Override
+          public List<X509Certificate> getCertificates(String country, byte[] kid) {
+            String base64Kid = Base64.encodeBase64String(kid);
+            cert = (X509Certificate) verifierRepository.getCertificate(base64Kid);
+            return cert != null ? Arrays.asList(cert) : Lists.newArrayList();
+          }
+        }, new DefaultBarcodeDecoder());
 
   }
 
@@ -73,35 +83,79 @@ public class VerifierServiceImpl implements VerifierService {
 
     try {
 
-      DigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decodeBarcode(qrCodeImg);
+      VerificaC19DigitalCovidCertificate digitalCovidCertificate =
+          dgcBarcodeDecoder.decodeBarcode(qrCodeImg);
 
       return validate(digitalCovidCertificate, validationScanMode);
 
-    } catch (CertificateExpiredException | SignatureException e) {
-      return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
-    } catch (Exception e) {
+    } catch (VerificaC19CertificateExpiredDGCException e) {
+
+      LOG.trace(e.getMessage());
+
+      // CBOR encoding of a DGC v1 payload
+      byte[] cBor = e.getCbor();
+
+      return invalidateCertificate(cBor);
+
+    } catch (VerificaC19SignatureDGCException e) {
+
+      LOG.trace(e.getMessage());
+
+      // CBOR encoding of a DGC v1 payload
+      byte[] cBor = e.getCbor();
+
+      return invalidateCertificate(cBor);
+
+    } catch (SignatureException e) {
+      LOG.trace(e.getMessage());
       return new CertificateSimple(CertificateStatus.NOT_VALID);
+    } catch (Exception e) {
+      LOG.trace(e.getMessage());
+      return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
     }
 
   }
+
 
   @Override
   public CertificateSimple verify(String qrCodeTxt, ValidationScanMode validationScanMode) {
 
     try {
 
-      DigitalCovidCertificate digitalCovidCertificate = dgcBarcodeDecoder.decode(qrCodeTxt);
+      VerificaC19DigitalCovidCertificate digitalCovidCertificate =
+          dgcBarcodeDecoder.decode(qrCodeTxt);
 
       return validate(digitalCovidCertificate, validationScanMode);
 
-    } catch (CertificateExpiredException | SignatureException e) {
-      return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
-    } catch (Exception e) {
+    } catch (VerificaC19CertificateExpiredDGCException e) {
+
+      LOG.trace(e.getMessage());
+
+      // CBOR encoding of a DGC v1 payload
+      byte[] cBor = e.getCbor();
+
+      return invalidateCertificate(cBor);
+
+    } catch (VerificaC19SignatureDGCException e) {
+
+      LOG.trace(e.getMessage());
+
+      // CBOR encoding of a DGC v1 payload
+      byte[] cBor = e.getCbor();
+
+      return invalidateCertificate(cBor);
+
+    } catch (SignatureException e) {
+      LOG.trace(e.getMessage());
       return new CertificateSimple(CertificateStatus.NOT_VALID);
+    } catch (Exception e) {
+      LOG.trace(e.getMessage());
+      return new CertificateSimple(CertificateStatus.NOT_EU_DCC);
     }
+
   }
 
-  private CertificateSimple validate(DigitalCovidCertificate digitalCovidCertificate,
+  private CertificateSimple validate(VerificaC19DigitalCovidCertificate digitalCovidCertificate,
       ValidationScanMode validationScanMode) throws NoSuchAlgorithmException {
 
     CertificateSimple certificateSimple = new CertificateSimple();
@@ -111,8 +165,6 @@ public class VerifierServiceImpl implements VerifierService {
     certificateSimple.setCertificateStatus(
         getCertificateStatus(digitalCovidCertificate, validationScanMode, certificateIdentifier));
 
-
-
     certificateSimple.setPerson(new SimplePersonModel(digitalCovidCertificate.getNam().getFnt(),
         digitalCovidCertificate.getNam().getFn(), digitalCovidCertificate.getNam().getGnt(),
         digitalCovidCertificate.getNam().getGn()));
@@ -120,6 +172,25 @@ public class VerifierServiceImpl implements VerifierService {
     certificateSimple.setDateOfBirth(digitalCovidCertificate.getDateOfBirth().asLocalDate());
     certificateSimple.setTimeStamp(LocalDateTime.now());
 
+    return certificateSimple;
+  }
+
+  private CertificateSimple invalidateCertificate(byte[] cBor) {
+    CertificateSimple certificateSimple = new CertificateSimple();
+
+    certificateSimple.setCertificateStatus(CertificateStatus.NOT_VALID);
+    try {
+      VerificaC19DigitalCovidCertificate digitalCovidCertificate =
+          VerificaC19DigitalCovidCertificate.getCBORMapper().readValue(cBor,
+              VerificaC19DigitalCovidCertificate.class);
+      certificateSimple.setPerson(new SimplePersonModel(digitalCovidCertificate.getNam().getFnt(),
+          digitalCovidCertificate.getNam().getFn(), digitalCovidCertificate.getNam().getGnt(),
+          digitalCovidCertificate.getNam().getGn()));
+      certificateSimple.setDateOfBirth(digitalCovidCertificate.getDateOfBirth().asLocalDate());
+      certificateSimple.setTimeStamp(LocalDateTime.now());
+    } catch (IOException e1) {
+      LOG.error("Failed to decode DCC from CBOR encoding", e1);
+    }
     return certificateSimple;
   }
 
@@ -133,7 +204,7 @@ public class VerifierServiceImpl implements VerifierService {
    * @throws NoSuchAlgorithmException
    *
    */
-  private CertificateStatus getCertificateStatus(DigitalCovidCertificate cert,
+  private CertificateStatus getCertificateStatus(VerificaC19DigitalCovidCertificate cert,
       ValidationScanMode validationScanMode, String certificateIdentifier)
       throws NoSuchAlgorithmException {
 
@@ -167,7 +238,53 @@ public class VerifierServiceImpl implements VerifierService {
       return checkVaccinations(cert.getV(), validationScanMode);
     }
 
+    if (!CollectionUtils.isEmpty(cert.getE())) {
+      return checkExemptions(cert.getE(), validationScanMode);
+    }
+
+
     return CertificateStatus.NOT_VALID;
+  }
+
+  /**
+   * This method checks the [Exemption] and returns a proper [CertificateStatus] after checking the
+   * validity start and end dates.
+   */
+  private CertificateStatus checkExemptions(List<Exemption> list,
+      ValidationScanMode validationScanMode) {
+
+
+    try {
+
+      Exemption lastExemption = Iterables.getLast(list);
+
+      LocalDate startDate = LocalDate.parse(lastExemption.getCertificateValidFrom());
+
+      LocalDate endDate = lastExemption.getCertificateValidUntil() != null
+          ? LocalDate.parse(lastExemption.getCertificateValidUntil())
+          : null;
+
+      LOG.debug("dates start:{} end:{}", startDate, endDate);
+
+      if (startDate.isAfter(LocalDate.now())) {
+        return CertificateStatus.NOT_VALID_YET;
+      }
+
+      if (endDate != null) {
+        if (LocalDate.now().isAfter(endDate)) {
+          return CertificateStatus.NOT_VALID;
+        }
+      }
+
+      if (validationScanMode.equals(ValidationScanMode.BOOSTER_DGP)) {
+        return CertificateStatus.TEST_NEEDED;
+      } else {
+        return CertificateStatus.VALID;
+      }
+    } catch (Exception e) {
+      return CertificateStatus.NOT_EU_DCC;
+    }
+
   }
 
   /**
@@ -182,20 +299,33 @@ public class VerifierServiceImpl implements VerifierService {
       ValidationScanMode validationScanMode) {
     try {
 
+      boolean isRecoveryBis = isRecoveryBis(list, validationScanMode);
+
       RecoveryEntry lastRecovery = Iterables.getLast(list);
 
-      LocalDate startDate = lastRecovery.getDf().plusDays(Long.valueOf(getRecoveryCertStartDay()));
+      String countryCode =
+          validationScanMode == ValidationScanMode.NORMAL_DGP ? lastRecovery.getCo()
+              : Country.IT.getValue();
+
+
+
+      String recoveryCertEndDay =
+          isRecoveryBis ? getRecoveryCertPvEndDay() : getRecoveryCertEndDayUnified(countryCode);
+      String recoveryCertStartDay =
+          isRecoveryBis ? getRecoveryCertPVStartDay() : getRecoveryCertStartDayUnified(countryCode);
+
+
+
+      LocalDate startDate = lastRecovery.getDf();
       LocalDate endDate = lastRecovery.getDu();
 
       LOG.debug("dates start:{} end:{}", startDate, endDate);
 
-      if (startDate.isAfter(LocalDate.now())) {
+
+      if ((startDate.plusDays(Long.valueOf(recoveryCertStartDay)).isAfter(LocalDate.now()))) {
         return CertificateStatus.NOT_VALID_YET;
-      } else if (LocalDate.now()
-          .isAfter(startDate.plusDays(Long.valueOf(getRecoveryCertEndDay())))) {
+      } else if (LocalDate.now().isAfter(startDate.plusDays(Long.valueOf(recoveryCertEndDay)))) {
         return CertificateStatus.NOT_VALID;
-      } else if (LocalDate.now().isAfter(endDate)) {
-        return CertificateStatus.VALID;
       } else {
         if (validationScanMode.equals(ValidationScanMode.BOOSTER_DGP)) {
           return CertificateStatus.TEST_NEEDED;
@@ -208,6 +338,26 @@ public class VerifierServiceImpl implements VerifierService {
     } catch (Exception e) {
       return CertificateStatus.NOT_VALID;
     }
+  }
+
+  private boolean isRecoveryBis(List<RecoveryEntry> list, ValidationScanMode validationScanMode)
+      throws CertificateParsingException {
+
+    RecoveryEntry firstRecovery = Iterables.getFirst(list, null);
+    if (firstRecovery != null && Country.IT.getValue().equals(firstRecovery.getCo())) {
+      List<String> keysUsage = cert.getExtendedKeyUsage();
+      Iterator<String> it = keysUsage.iterator();
+      while (it.hasNext()) {
+        String keyUsage = it.next();
+        if (CertCode.OID_RECOVERY.getValue().equals(keyUsage)
+            || CertCode.OID_ALT_RECOVERY.getValue().equals(keyUsage)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+
   }
 
   /**
@@ -260,20 +410,30 @@ public class VerifierServiceImpl implements VerifierService {
         LocalDate startDate = null;
         LocalDate endDate = null;
 
-        if (lastVaccination.getMp().equals(MedicinalProduct.JOHNSON)
-            && ((lastVaccination.getDn() > lastVaccination.getSd())
-                || (lastVaccination.getDn() == lastVaccination.getSd()
-                    && lastVaccination.getDn() >= 2))) {
-          startDate = lastVaccination.getDt();
+        Long startDaysToAdd;
+        Long endDaysToAdd;
 
-          endDate = lastVaccination.getDt()
-              .plusDays(Long.valueOf(getVaccineEndDayComplete(lastVaccination.getMp())));
+        String countryCode =
+            validationScanMode == ValidationScanMode.NORMAL_DGP ? lastVaccination.getCo()
+                : Country.IT.getValue();
+
+        if (lastVaccination.getMp().equals(MedicinalProduct.JOHNSON)
+            && ((lastVaccination.getDn() >= 2))
+            || !lastVaccination.getMp().equals(MedicinalProduct.JOHNSON)
+                && ((lastVaccination.getDn() >= 3))) {
+
+          startDaysToAdd = Long.valueOf(getVaccineStartDayBoosterUnified(countryCode));
+          endDaysToAdd = Long.valueOf(getVaccineEndDayBoosterUnified(countryCode));
         } else {
-          startDate = lastVaccination.getDt()
-              .plusDays(Long.valueOf(getVaccineStartDayComplete(lastVaccination.getMp())));
-          endDate = lastVaccination.getDt()
-              .plusDays(Long.valueOf(getVaccineEndDayComplete(lastVaccination.getMp())));
+          startDaysToAdd =
+              Long.valueOf(getVaccineStartDayCompleteUnified(countryCode, lastVaccination.getMp()));
+          endDaysToAdd = Long.valueOf(getVaccineEndDayCompleteUnified(countryCode));
         }
+
+
+        startDate = lastVaccination.getDt().plusDays(startDaysToAdd);
+        endDate = lastVaccination.getDt().plusDays(endDaysToAdd);
+
         LOG.debug("dates start:{} end: {}", startDate, endDate);
 
         if (startDate.isAfter(LocalDate.now())) {
@@ -353,7 +513,16 @@ public class VerifierServiceImpl implements VerifierService {
     }
   }
 
-  private String extractUVCI(DigitalCovidCertificate digitalCovidCertificate) {
+  /**
+   * This method extracts the UCVI from an Exemption, Vaccine, Recovery or Test based on what was
+   * received.
+   */
+  private String extractUVCI(VerificaC19DigitalCovidCertificate digitalCovidCertificate) {
+
+    Optional<Exemption> e = Optional.ofNullable(digitalCovidCertificate.getE())
+        .orElseGet(Collections::emptyList).stream().findFirst();
+    if (e.isPresent())
+      return e.get().getCertificateIdentifier();
 
     Optional<VaccinationEntry> v = Optional.ofNullable(digitalCovidCertificate.getV())
         .orElseGet(Collections::emptyList).stream().findFirst();
@@ -373,12 +542,20 @@ public class VerifierServiceImpl implements VerifierService {
     return "";
   }
 
-  private String getRecoveryCertStartDay() {
-    return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_START_DAY);
+  // private String getRecoveryCertStartDay() {
+  // return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_START_DAY);
+  // }
+
+  private String getRecoveryCertPVStartDay() {
+    return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_PV_START_DAY);
   }
 
-  private String getRecoveryCertEndDay() {
-    return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_END_DAY);
+  // private String getRecoveryCertEndDay() {
+  // return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_END_DAY);
+  // }
+
+  private String getRecoveryCertPvEndDay() {
+    return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_PV_END_DAY);
   }
 
   private String getMolecularTestStartHour() {
@@ -407,15 +584,142 @@ public class VerifierServiceImpl implements VerifierService {
         ValidationRulesEnum.VACCINE_END_DAY_NOT_COMPLETE, vaccineType);
   }
 
-  private String getVaccineStartDayComplete(String vaccineType) {
-    return preferences.getValidationRuleValueByNameAndType(
-        ValidationRulesEnum.VACCINE_START_DAY_COMPLETE, vaccineType);
-  }
+  // private String getVaccineStartDayComplete(String vaccineType) {
+  // return preferences.getValidationRuleValueByNameAndType(
+  // ValidationRulesEnum.VACCINE_START_DAY_COMPLETE, vaccineType);
+  // }
 
   private String getVaccineEndDayComplete(String vaccineType) {
     return preferences.getValidationRuleValueByNameAndType(
         ValidationRulesEnum.VACCINE_END_DAY_COMPLETE, vaccineType);
   }
+
+  private String getVaccineStartDayCompleteUnified(String countryCode, String medicalProduct) {
+    int daysToAdd = MedicinalProduct.JOHNSON.equalsIgnoreCase(medicalProduct) ? 15 : 0;
+
+    int startDay = 0;
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_START_DAY_COMPLETE_IT);
+      if (StringUtils.hasText(value)) {
+        startDay = Integer.valueOf(value);
+      }
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_START_DAY_COMPLETE_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        startDay = Integer.valueOf(value);
+      }
+    }
+
+    int valueCal = startDay + daysToAdd;
+
+    return String.valueOf(valueCal);
+
+  }
+
+  private String getVaccineEndDayCompleteUnified(String countryCode) {
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value =
+          preferences.getValidationRuleValueByName(ValidationRulesEnum.VACCINE_END_DAY_COMPLETE_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "180";
+      }
+
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_END_DAY_COMPLETE_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "270";
+      }
+    }
+  }
+
+  private String getVaccineStartDayBoosterUnified(String countryCode) {
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_START_DAY_BOOSTER_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "0";
+      }
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_START_DAY_BOOSTER_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "0";
+      }
+    }
+  }
+
+  private String getVaccineEndDayBoosterUnified(String countryCode) {
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value =
+          preferences.getValidationRuleValueByName(ValidationRulesEnum.VACCINE_END_DAY_BOOSTER_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "180";
+      }
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_END_DAY_BOOSTER_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "270";
+      }
+    }
+
+  }
+
+  private String getRecoveryCertStartDayUnified(String countryCode) {
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value =
+          preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_START_DAY_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "0";
+      }
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_START_DAY_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "0";
+      }
+    }
+  }
+
+  private String getRecoveryCertEndDayUnified(String countryCode) {
+    if (Country.IT.getValue().equals(countryCode)) {
+      String value =
+          preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_END_DAY_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "180";
+      }
+    } else {
+      String value = preferences
+          .getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_END_DAY_NOT_IT);
+      if (StringUtils.hasText(value)) {
+        return value;
+      } else {
+        return "270";
+      }
+    }
+  }
+
 
   private boolean isCertificateRevoked(String hash) {
     if (!preferences.isDrlSyncActive()) {
