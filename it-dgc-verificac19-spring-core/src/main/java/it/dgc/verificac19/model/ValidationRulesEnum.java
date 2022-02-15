@@ -25,8 +25,8 @@ public enum ValidationRulesEnum {
   @SerializedName(value = "recovery_pv_cert_end_day")
   RECOVERY_CERT_PV_END_DAY("recovery_pv_cert_end_day"),
 
-  @SerializedName(value = "recovery_cert_end_day_school")
-  RECOVERY_CERT_END_DAY_SCHOOL("recovery_cert_end_day_school"),
+  // @SerializedName(value = "recovery_cert_end_day_school")
+  // RECOVERY_CERT_END_DAY_SCHOOL("recovery_cert_end_day_school"),
 
   @SerializedName(value = "recovery_cert_end_day")
   RECOVERY_CERT_END_DAY("recovery_cert_end_day"),
@@ -55,8 +55,8 @@ public enum ValidationRulesEnum {
   @SerializedName(value = "vaccine_end_day_complete")
   VACCINE_END_DAY_COMPLETE("vaccine_end_day_complete"),
 
-  @SerializedName(value = "vaccine_end_day_school")
-  VACCINE_END_DAY_SCHOOL("vaccine_end_day_school"),
+  // @SerializedName(value = "vaccine_end_day_school")
+  // VACCINE_END_DAY_SCHOOL("vaccine_end_day_school"),
 
   @SerializedName(value = "vaccine_start_day_complete_IT")
   VACCINE_START_DAY_COMPLETE_IT("vaccine_start_day_complete_IT"),
