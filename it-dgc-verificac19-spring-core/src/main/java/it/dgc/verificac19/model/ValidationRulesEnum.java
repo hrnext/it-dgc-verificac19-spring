@@ -94,6 +94,12 @@ public enum ValidationRulesEnum {
   @SerializedName(value = "recovery_cert_end_day_NOT_IT")
   RECOVERY_CERT_END_DAY_NOT_IT("recovery_cert_end_day_NOT_IT"),
 
+  @SerializedName(value = "vaccine_end_day_complete_extended_EMA")
+  VACCINE_END_DAY_COMPLETE_EXTENDED_EMA("vaccine_end_day_complete_extended_EMA"),
+
+  @SerializedName(value = "EMA_vaccines")
+  EMA_VACCINES("EMA_vaccines"),
+
   @SerializedName(value = "black_list_uvci")
   BLACK_LIST_UVCI("black_list_uvci"),
 

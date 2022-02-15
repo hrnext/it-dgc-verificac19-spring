@@ -9,7 +9,7 @@ package it.dgc.verificac19.model;
  */
 public enum Country {
 
-  IT("IT");
+  IT("IT"), NOT_IT("NOT_IT"), SM("SM");
 
   private String value;
 

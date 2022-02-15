@@ -18,13 +18,13 @@ public enum ValidationScanMode {
   BOOSTER_DGP,
 
   /**
-   * (STUDENTI/ SCHOOL) solo per APP VerificaC19
-   */
-  // SCHOOL,
-
-  /**
    * (LAVORO / WORK)
    */
-  WORK
+  WORK,
+
+  /**
+   * (ENTRY_ITALY)
+   */
+  ENTRY_ITALY;
 
 }

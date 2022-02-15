@@ -10,4 +10,8 @@ package it.dgc.verificac19.model;
 public class Const {
   public static int VACCINE_MANDATORY_AGE = 50;
 
+  public static int NO_VALUE_NUMBER = 0;
+
+  public static String NO_VALUE_TEXT = "";
+
 }
