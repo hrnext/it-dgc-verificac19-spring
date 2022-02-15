@@ -364,7 +364,7 @@ public class VerifierServiceImpl implements VerifierService {
       throws CertificateParsingException {
 
     RecoveryEntry firstRecovery = Iterables.getFirst(list, null);
-    if (firstRecovery != null && Country.IT.getValue().equals(firstRecovery.getCo())) {
+    if (firstRecovery != null && Country.IT.getValue().equals(firstRecovery.getCo()) && cert.getExtendedKeyUsage() != null) {
       List<String> keysUsage = cert.getExtendedKeyUsage();
       Iterator<String> it = keysUsage.iterator();
       while (it.hasNext()) {
