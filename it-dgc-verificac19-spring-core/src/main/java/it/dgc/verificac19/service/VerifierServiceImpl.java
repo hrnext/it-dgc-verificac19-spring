@@ -73,7 +73,7 @@ public class VerifierServiceImpl implements VerifierService {
           public List<X509Certificate> getCertificates(String country, byte[] kid) {
             String base64Kid = Base64.encodeBase64String(kid);
             cert = (X509Certificate) verifierRepository.getCertificate(base64Kid);
-            return cert != null ? Arrays.asList(cert) : Lists.newArrayList();
+            return cert != null ? List.of(cert) : Lists.newArrayList();
           }
         }, new DefaultBarcodeDecoder());
 
@@ -328,7 +328,7 @@ public class VerifierServiceImpl implements VerifierService {
 
       LOG.debug("dates start:{} end:{}", startDate, endDate);
 
-      if ((startDate.plusDays(Long.valueOf(startDaysToAdd)).isAfter(LocalDate.now()))) {
+      if ((startDate.plusDays(Long.parseLong(startDaysToAdd)).isAfter(LocalDate.now()))) {
         return CertificateStatus.NOT_VALID_YET;
       } else if (LocalDate.now().isAfter(endDate)) {
         return CertificateStatus.EXPIRED;
@@ -373,7 +373,7 @@ public class VerifierServiceImpl implements VerifierService {
    * the proper status as [CertificateStatus].
    * 
    * @param validationScanMode
-   * @param bithDate
+   * @param birthDate
    *
    */
   private CertificateStatus checkVaccinations(List<VaccinationEntry> list,
@@ -431,8 +431,8 @@ public class VerifierServiceImpl implements VerifierService {
 
 
 
-    LocalDate startDate = dateOfVaccination.plusDays(Long.valueOf(startDaysToAdd));
-    LocalDate endDate = dateOfVaccination.plusDays(Long.valueOf(endDaysToAdd));
+    LocalDate startDate = dateOfVaccination.plusDays(Long.parseLong(startDaysToAdd));
+    LocalDate endDate = dateOfVaccination.plusDays(Long.parseLong(endDaysToAdd));
 
     if (LocalDate.now().isBefore(startDate))
       return CertificateStatus.NOT_VALID_YET;
@@ -481,8 +481,8 @@ public class VerifierServiceImpl implements VerifierService {
       endDaysToAdd = getVaccineEndDayCompleteUnified(Country.IT.getValue());
     }
 
-    LocalDate startDate = dateOfVaccination.plusDays(Long.valueOf(startDaysToAdd));
-    LocalDate endDate = dateOfVaccination.plusDays(Long.valueOf(endDaysToAdd));
+    LocalDate startDate = dateOfVaccination.plusDays(Long.parseLong(startDaysToAdd));
+    LocalDate endDate = dateOfVaccination.plusDays(Long.parseLong(endDaysToAdd));
 
     if (LocalDate.now().isBefore(startDate))
       return CertificateStatus.NOT_VALID_YET;
@@ -515,9 +515,9 @@ public class VerifierServiceImpl implements VerifierService {
 
       if (isNotComplete(lastVaccination.getDn(), lastVaccination.getSd())) {
         if (isEMA(lastVaccination.getMp(), lastVaccination.getCo())) {
-          startDate = dateOfVaccination.plusDays(Long.valueOf(lastVaccination.getMp()));
+          startDate = dateOfVaccination.plusDays(Long.parseLong(lastVaccination.getMp()));
           endDate = dateOfVaccination
-              .plusDays(Long.valueOf(getVaccineEndDayNotComplete(lastVaccination.getMp())));
+              .plusDays(Long.parseLong(getVaccineEndDayNotComplete(lastVaccination.getMp())));
         } else {
           return CertificateStatus.NOT_VALID;
         }
@@ -541,9 +541,9 @@ public class VerifierServiceImpl implements VerifierService {
 
         String extendedDaysToAdd = getVaccineEndDayCompleteExtendedEMA();
 
-        startDate = dateOfVaccination.plusDays(Long.valueOf(startDaysToAdd));
-        endDate = dateOfVaccination.plusDays(Long.valueOf(endDaysToAdd));
-        extendedDate = dateOfVaccination.plusDays(Long.valueOf(extendedDaysToAdd));
+        startDate = dateOfVaccination.plusDays(Long.parseLong(startDaysToAdd));
+        endDate = dateOfVaccination.plusDays(Long.parseLong(endDaysToAdd));
+        extendedDate = dateOfVaccination.plusDays(Long.parseLong(extendedDaysToAdd));
       }
     }
 
@@ -617,14 +617,10 @@ public class VerifierServiceImpl implements VerifierService {
         startDaysToAdd =
             getVaccineStartDayCompleteUnified(Country.IT.getValue(), lastVaccination.getMp());
       }
-      startDate = dateOfVaccination.plusDays(Long.valueOf(startDaysToAdd));
-    }
-
-    if (isNotComplete(lastVaccination.getDn(), lastVaccination.getSd())) {
-      startDate = dateOfVaccination
-          .plusDays(Long.valueOf(getVaccineStartDayNotComplete(lastVaccination.getMp())));
+      startDate = dateOfVaccination.plusDays(Long.parseLong(startDaysToAdd));
     } else {
-      startDate = dateOfVaccination;
+      startDate = dateOfVaccination
+          .plusDays(Long.parseLong(getVaccineStartDayNotComplete(lastVaccination.getMp())));
     }
 
 
@@ -636,14 +632,10 @@ public class VerifierServiceImpl implements VerifierService {
       } else {
         endDaysToAdd = getVaccineEndDayCompleteUnified(Country.IT.getValue());
       }
-      endDate = dateOfVaccination.plusDays(Long.valueOf(endDaysToAdd));
-    }
-
-    if (isNotComplete(lastVaccination.getDn(), lastVaccination.getSd())) {
-      endDate = dateOfVaccination
-          .plusDays(Long.valueOf(getVaccineEndDayNotComplete(lastVaccination.getMp())));
+      endDate = dateOfVaccination.plusDays(Long.parseLong(endDaysToAdd));
     } else {
-      endDate = dateOfVaccination;
+        endDate = dateOfVaccination
+                .plusDays(Long.parseLong(getVaccineEndDayNotComplete(lastVaccination.getMp())));
     }
 
     if (LocalDate.now().isBefore(startDate))
@@ -670,7 +662,7 @@ public class VerifierServiceImpl implements VerifierService {
       LocalDate birthDate) {
 
     TestEntry lastTest = Iterables.getLast(list);
-    if (lastTest.getTr() == TestResult.DETECTED.getValue()) {
+    if (lastTest.getTr().equals(TestResult.DETECTED.getValue())) {
       return CertificateStatus.NOT_VALID;
     }
 
@@ -684,11 +676,11 @@ public class VerifierServiceImpl implements VerifierService {
       LocalDateTime endDate = null;
 
       if (testType.equals(TestType.MOLECULAR.getValue())) {
-        startDate = ldtDateTimeOfCollection.plusHours(Long.valueOf(getMolecularTestStartHour()));
-        endDate = ldtDateTimeOfCollection.plusHours(Long.valueOf(getMolecularTestEndHour()));
+        startDate = ldtDateTimeOfCollection.plusHours(Long.parseLong(getMolecularTestStartHour()));
+        endDate = ldtDateTimeOfCollection.plusHours(Long.parseLong(getMolecularTestEndHour()));
       } else if (testType.equals(TestType.RAPID.getValue())) {
-        startDate = ldtDateTimeOfCollection.plusHours(Long.valueOf(getRapidTestStartHour()));
-        endDate = ldtDateTimeOfCollection.plusHours(Long.valueOf(getRapidTestEndHour()));
+        startDate = ldtDateTimeOfCollection.plusHours(Long.parseLong(getRapidTestStartHour()));
+        endDate = ldtDateTimeOfCollection.plusHours(Long.parseLong(getRapidTestEndHour()));
       } else {
         return CertificateStatus.NOT_VALID;
       }
@@ -806,7 +798,7 @@ public class VerifierServiceImpl implements VerifierService {
 
   private String getVaccineStartDayCompleteUnified(String countryCode, String medicalProduct) {
     int daysToAdd = MedicinalProduct.JANSEN.equals(medicalProduct)
-        ? Integer.valueOf(getVaccineStartDayComplete(MedicinalProduct.JANSEN))
+        ? Integer.parseInt(getVaccineStartDayComplete(MedicinalProduct.JANSEN))
         : Const.NO_VALUE_NUMBER;
 
     int startDay = 0;
@@ -814,13 +806,13 @@ public class VerifierServiceImpl implements VerifierService {
       String value = preferences
           .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_START_DAY_COMPLETE_IT);
       if (StringUtils.hasText(value)) {
-        startDay = Integer.valueOf(value);
+        startDay = Integer.parseInt(value);
       }
     } else {
       String value = preferences
           .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_START_DAY_COMPLETE_NOT_IT);
       if (StringUtils.hasText(value)) {
-        startDay = Integer.valueOf(value);
+        startDay = Integer.parseInt(value);
       }
     }
 
@@ -949,7 +941,7 @@ public class VerifierServiceImpl implements VerifierService {
     String[] arrayValues;
     if (values != null) {
       arrayValues = values.split(";");
-      isStandardEma = Arrays.asList(arrayValues).contains(medicinalProduct) ? true : false;
+      isStandardEma = Arrays.asList(arrayValues).contains(medicinalProduct);
     }
 
 
