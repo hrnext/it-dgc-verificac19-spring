@@ -73,7 +73,7 @@ public class VerifierServiceImpl implements VerifierService {
           public List<X509Certificate> getCertificates(String country, byte[] kid) {
             String base64Kid = Base64.encodeBase64String(kid);
             cert = (X509Certificate) verifierRepository.getCertificate(base64Kid);
-            return cert != null ? List.of(cert) : Lists.newArrayList();
+            return cert != null ? Lists.newArrayList(cert) : Lists.newArrayList();
           }
         }, new DefaultBarcodeDecoder());
 
