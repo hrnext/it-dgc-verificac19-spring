@@ -499,8 +499,13 @@ public class VerifierRepositoryImpl implements VerifierRepository {
   private void deleteListFromDB(List<String> deltaDeleteList) {
 
     try {
-
-      revokedPassDao.deleteAllByHashedUVCIIn(deltaDeleteList);
+      List<String> subList = null;
+      int num = (int) Math.ceil((deltaDeleteList.size() / 1000d));
+      for (int i = 0; i < num; i++) {
+        subList = new ArrayList<String>(
+            deltaDeleteList.subList(i * 1000, Math.min((i + 1) * 1000, deltaDeleteList.size())));
+        revokedPassDao.deleteAllByHashedUVCIIn(subList);
+      }
       LOG.info("Revoke deleted count: " + deltaDeleteList.size());
 
     } catch (Exception e) {
