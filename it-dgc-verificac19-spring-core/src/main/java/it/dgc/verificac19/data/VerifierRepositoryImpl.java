@@ -269,7 +269,7 @@ public class VerifierRepositoryImpl implements VerifierRepository {
   }
 
   private boolean outDatedVersion(CrlStatus crlStatus) {
-    return (crlStatus.getVersion() != preferences.getCurrentVersion());
+    return (crlStatus.getVersion().intValue() != preferences.getCurrentVersion().intValue());
   }
 
   private long getCurrentVersionDrl() {
@@ -423,7 +423,7 @@ public class VerifierRepositoryImpl implements VerifierRepository {
   }
 
   private void getRevokeList(Long version, CertificateRevocationList certificateRevocationList) {
-    if (version == certificateRevocationList.getVersion()) {
+    if (version.intValue() == certificateRevocationList.getVersion().intValue()) {
       preferences.setCurrentChunk(preferences.getCurrentChunk() + 1);
       boolean isFirstChunk = preferences.getCurrentChunk() == 1;
       if (isFirstChunk && certificateRevocationList.getDelta() == null) {
@@ -476,7 +476,7 @@ public class VerifierRepositoryImpl implements VerifierRepository {
 
   private boolean noMoreChunks(CrlStatus status) {
 
-    return preferences.getCurrentChunk() < status.getTotalChunk();
+    return preferences.getCurrentChunk() < status.getTotalChunk().intValue();
   }
 
   private void insertListToDB(List<String> deltaInsertList) {
