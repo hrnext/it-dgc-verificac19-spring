@@ -4,37 +4,42 @@
 package it.dgc.verificac19.model;
 
 import java.io.Serializable;
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * @author NIGFRA
  *
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonIgnoreProperties({"cu", "fc"})
 public class Exemption implements Serializable {
 
   private static final long serialVersionUID = 3222424362443398857L;
 
-  @SerializedName("tg")
+  @JsonProperty("tg")
   private String disease;
 
-  @SerializedName("co")
+  @JsonProperty("co")
   private String countryOfVaccination;
 
-  @SerializedName("is")
+  @JsonProperty("is")
   private String certificateIssuer;
 
-  @SerializedName("ci")
+  @JsonProperty("ci")
   private String certificateIdentifier;
 
-  @SerializedName("df")
+  @JsonProperty("df")
   private String certificateValidFrom;
 
-  @SerializedName("du")
+  @JsonProperty("du")
   private String certificateValidUntil;
 
   /**
    * @return the disease
    */
+  @JsonProperty("tg")
   public String getDisease() {
     return disease;
   }
@@ -42,6 +47,7 @@ public class Exemption implements Serializable {
   /**
    * @param disease the disease to set
    */
+  @JsonProperty("tg")
   public void setDisease(String disease) {
     this.disease = disease;
   }
@@ -49,6 +55,7 @@ public class Exemption implements Serializable {
   /**
    * @return the countryOfVaccination
    */
+  @JsonProperty("co")
   public String getCountryOfVaccination() {
     return countryOfVaccination;
   }
@@ -56,6 +63,7 @@ public class Exemption implements Serializable {
   /**
    * @param countryOfVaccination the countryOfVaccination to set
    */
+  @JsonProperty("co")
   public void setCountryOfVaccination(String countryOfVaccination) {
     this.countryOfVaccination = countryOfVaccination;
   }
@@ -63,6 +71,7 @@ public class Exemption implements Serializable {
   /**
    * @return the certificateIssuer
    */
+  @JsonProperty("is")
   public String getCertificateIssuer() {
     return certificateIssuer;
   }
@@ -70,6 +79,7 @@ public class Exemption implements Serializable {
   /**
    * @param certificateIssuer the certificateIssuer to set
    */
+  @JsonProperty("is")
   public void setCertificateIssuer(String certificateIssuer) {
     this.certificateIssuer = certificateIssuer;
   }
@@ -77,6 +87,7 @@ public class Exemption implements Serializable {
   /**
    * @return the certificateIdentifier
    */
+  @JsonProperty("ci")
   public String getCertificateIdentifier() {
     return certificateIdentifier;
   }
@@ -84,6 +95,7 @@ public class Exemption implements Serializable {
   /**
    * @param certificateIdentifier the certificateIdentifier to set
    */
+  @JsonProperty("ci")
   public void setCertificateIdentifier(String certificateIdentifier) {
     this.certificateIdentifier = certificateIdentifier;
   }
@@ -91,6 +103,7 @@ public class Exemption implements Serializable {
   /**
    * @return the certificateValidFrom
    */
+  @JsonProperty("df")
   public String getCertificateValidFrom() {
     return certificateValidFrom;
   }
@@ -98,6 +111,7 @@ public class Exemption implements Serializable {
   /**
    * @param certificateValidFrom the certificateValidFrom to set
    */
+  @JsonProperty("df")
   public void setCertificateValidFrom(String certificateValidFrom) {
     this.certificateValidFrom = certificateValidFrom;
   }
@@ -105,6 +119,7 @@ public class Exemption implements Serializable {
   /**
    * @return the certificateValidUntil
    */
+  @JsonProperty("du")
   public String getCertificateValidUntil() {
     return certificateValidUntil;
   }
@@ -112,6 +127,7 @@ public class Exemption implements Serializable {
   /**
    * @param certificateValidUntil the certificateValidUntil to set
    */
+  @JsonProperty("du")
   public void setCertificateValidUntil(String certificateValidUntil) {
     this.certificateValidUntil = certificateValidUntil;
   }
