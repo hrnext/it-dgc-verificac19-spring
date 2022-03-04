@@ -1,8 +1,7 @@
 package it.dgc.verificac19.data.remote;
 
 import java.io.IOException;
-
-import it.dgc.verificac19.utility.Utility;
+import java.util.Objects;
 import okhttp3.Interceptor;
 import okhttp3.Request;
 import okhttp3.Request.Builder;
@@ -15,7 +14,7 @@ import okhttp3.Response;
  */
 public class HeaderInterceptor implements Interceptor {
 
-  private final static String userAgent = "DGCA it-dgc-verificac19-spring";
+  private final static String userAgent = "verificac19-spring/%s";
 
   private final static String cacheControl = "no-cache";
 
@@ -30,11 +29,13 @@ public class HeaderInterceptor implements Interceptor {
   /**
    *
    * This method adds headers to the given [Request] HTTP package in input and returns it.
+   * @throws IOException 
    *
    */
-  private Request addHeadersToRequest(Request request) {
-    Builder requestBuilder = request.newBuilder().header("User-Agent", userAgent)
-        .header("Cache-Control", cacheControl).header("SDK-Version", Utility.SDK_VERSION);
+  private Request addHeadersToRequest(Request request) throws IOException {
+    Builder requestBuilder = request.newBuilder()
+        .header("User-Agent", String.format(userAgent, this.getClass().getPackage().getImplementationVersion()))
+        .header("Cache-Control", cacheControl);
     return requestBuilder.build();
   }
 
