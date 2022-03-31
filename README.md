@@ -117,8 +117,6 @@ Tipologia Rafforzata (SUPER_DGP): l'sdk considera valide solo le certificazioni 
 
 Tipologia Booster (BOOSTER_DGP): l'sdk considera valide solo le certificazioni verdi rilasciate a seguito della somministrazione di una dose di richiamo (booster) e quelle rilasciate al completamento del ciclo vaccinale o guarigione, richiedendo per queste ultime una ulteriore validazione di un tampone (esito negativo di un test al SARS-CoV-2 eseguito nelle 48 ore precedenti).
 
-Tipologia lavoro (WORK): per l'accesso ai luoghi di lavoro dal 15 febbraio, fino ai 49 anni di età l'sdk considera valide le certificazioni verdi generate da vaccinazione, da guarigione o da tampone. Dai 50 anni compiuti in su, considera valide solo le certificazioni verdi generate da vaccinazione o da guarigione. L'sdk considera comunque valide le certificazioni di esenzione dalla vaccinazione.
-
 Tipologia Ingresso IT (ENTRY_ITALY) = per l'ingresso in Italia dall'estero: l'sdk considera valide tutte le tipologie di certificazione verde COVID-19 (vaccinazione, guarigione o tampone) secondo le regole di validazione europee per la circolazione tra gli Stati Membri. Sulla base del tipo di vaccino o ciclo completato da più di 180gg e fino a 270gg può richiedere la contestuale presentazione di un esito negativo di un test al SARS-CoV-2 eseguito nelle 48 ore precedenti.
 
 Basandosi su questi dati &egrave; possibile disegnare la UI e fornire all'operatore lo
