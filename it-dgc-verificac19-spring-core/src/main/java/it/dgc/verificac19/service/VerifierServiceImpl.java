@@ -401,8 +401,6 @@ public class VerifierServiceImpl implements VerifierService {
       return vaccineStrengthenedStrategy(lastVaccination);
     } else if (ValidationScanMode.BOOSTER_DGP.equals(validationScanMode)) {
       return vaccineBoosterStrategy(lastVaccination);
-    } else if (ValidationScanMode.WORK.equals(validationScanMode)) {
-      return vaccineWorkStrategy(lastVaccination, birthDate);
     } else if (ValidationScanMode.ENTRY_ITALY.equals(validationScanMode)) {
       return vaccineEntryItalyStrategy(lastVaccination);
     } else {
@@ -442,19 +440,6 @@ public class VerifierServiceImpl implements VerifierService {
       return CertificateStatus.NOT_VALID;
     else
       return CertificateStatus.VALID;
-
-  }
-
-  private CertificateStatus vaccineWorkStrategy(VaccinationEntry lastVaccination,
-      LocalDate birthDate) {
-
-    int age = Utility.getAge(birthDate);
-
-    if (age >= Const.VACCINE_MANDATORY_AGE) {
-      return vaccineStrengthenedStrategy(lastVaccination);
-    } else {
-      return vaccineStandardStrategy(lastVaccination);
-    }
 
   }
 
@@ -634,8 +619,8 @@ public class VerifierServiceImpl implements VerifierService {
       }
       endDate = dateOfVaccination.plusDays(Long.parseLong(endDaysToAdd));
     } else {
-        endDate = dateOfVaccination
-                .plusDays(Long.parseLong(getVaccineEndDayNotComplete(lastVaccination.getMp())));
+      endDate = dateOfVaccination
+          .plusDays(Long.parseLong(getVaccineEndDayNotComplete(lastVaccination.getMp())));
     }
 
     if (LocalDate.now().isBefore(startDate))
@@ -691,16 +676,8 @@ public class VerifierServiceImpl implements VerifierService {
         return CertificateStatus.NOT_VALID_YET;
       } else if (LocalDateTime.now().isAfter(endDate)) {
         return CertificateStatus.NOT_VALID;
-      } else {
-
-        if (Utility.getAge(birthDate) >= Const.VACCINE_MANDATORY_AGE
-            && ValidationScanMode.WORK.equals(validationScanMode))
-          return CertificateStatus.NOT_VALID;
-        else
-          return CertificateStatus.VALID;
-
-      }
-
+      } else
+        return CertificateStatus.VALID;
     } catch (Exception e) {
       return CertificateStatus.NOT_EU_DCC;
     }

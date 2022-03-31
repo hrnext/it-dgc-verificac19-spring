@@ -39,8 +39,14 @@ public class VerifierRestApi {
 
     if (preferences.getDateLastFetch() == null
         || !preferences.getDateLastFetch().toLocalDate().isEqual(LocalDate.now())) {
-      logger.info("DRL not updated yet");
+      logger.info("SDK is out of date: [dateLastFatch: {} - dateNow: {}]",
+          preferences.getDateLastFetch() != null ? preferences.getDateLastFetch().toLocalDate()
+              : null,
+          LocalDate.now());
       return new ResponseEntity<>(ApiResponse.buildUpdatingResponse(), HttpStatus.OK);
+    } else if (isDownloadInProgress()) {
+      logger.info("SDK is being updated");
+      return ResponseEntity.ok().build();
     } else {
       final ValidationScanMode actualScanMode =
           inputScanMode == null ? ValidationScanMode.NORMAL_DGP : inputScanMode;
@@ -55,9 +61,16 @@ public class VerifierRestApi {
   public ResponseEntity<ApiResponse> verifyByImage(
       @RequestPart(name = "file", required = true) MultipartFile file,
       @RequestParam(name = "scanMode", required = true) ValidationScanMode inputScanMode) {
+
     if (preferences.getDateLastFetch() == null
         || !preferences.getDateLastFetch().toLocalDate().isEqual(LocalDate.now())) {
-      logger.info("DRL not updated yet");
+      logger.info("SDK is out of date: [dateLastFatch: {} - dateNow: {}]",
+          preferences.getDateLastFetch() != null ? preferences.getDateLastFetch().toLocalDate()
+              : null,
+          LocalDate.now());
+      return ResponseEntity.ok().build();
+    } else if (isDownloadInProgress()) {
+      logger.info("SDK is being updated");
       return ResponseEntity.ok().build();
     } else {
       final ValidationScanMode actualScanMode =
@@ -73,6 +86,11 @@ public class VerifierRestApi {
       VerifierRestApi.logResponse(validatedCertificate);
       return new ResponseEntity<>(ApiResponse.buildOkResponse(validatedCertificate), HttpStatus.OK);
     }
+  }
+
+  private boolean isDownloadInProgress() {
+    return preferences.isDownloadInProgress();
+
   }
 
   private static void logResponse(CertificateSimple certificateSimple) {

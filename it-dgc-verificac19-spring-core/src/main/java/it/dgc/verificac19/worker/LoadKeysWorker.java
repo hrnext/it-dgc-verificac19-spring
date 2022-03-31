@@ -27,6 +27,9 @@ public class LoadKeysWorker {
   @Autowired
   VerifierRepository verifierRepository;
 
+  private static final String cronExpression = "0 0 1,13 * * *";
+  private static final String timeZone = "CET";
+
   /**
    *
    * This method represents the periodic asynchronously work that the Work Manager accomplishes each
@@ -34,11 +37,11 @@ public class LoadKeysWorker {
    *
    */
   @Retryable(maxAttempts = Integer.MAX_VALUE)
-  @Scheduled(cron = "@daily")
+  @Scheduled(cron = cronExpression, zone = timeZone)
   public void doWork() {
-    LOG.info("key fetching start");
+    LOG.info("::: SDK Updates in progress - START :::");
     boolean res = verifierRepository.syncData();
-    LOG.info("key fetching result: {}", res);
+    LOG.info("::: SDK Updates in progress, result: {} - STOP :::", res);
     if (!res) {
       throw new RuntimeException("Error on sync data, retry");
     }

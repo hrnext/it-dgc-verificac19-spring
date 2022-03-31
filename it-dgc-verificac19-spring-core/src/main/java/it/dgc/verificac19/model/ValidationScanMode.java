@@ -18,11 +18,6 @@ public enum ValidationScanMode {
   BOOSTER_DGP,
 
   /**
-   * (LAVORO / WORK)
-   */
-  WORK,
-
-  /**
    * (ENTRY_ITALY)
    */
   ENTRY_ITALY;
