@@ -55,9 +55,6 @@ public enum ValidationRulesEnum {
   @SerializedName(value = "vaccine_end_day_complete")
   VACCINE_END_DAY_COMPLETE("vaccine_end_day_complete"),
 
-  // @SerializedName(value = "vaccine_end_day_school")
-  // VACCINE_END_DAY_SCHOOL("vaccine_end_day_school"),
-
   @SerializedName(value = "vaccine_start_day_complete_IT")
   VACCINE_START_DAY_COMPLETE_IT("vaccine_start_day_complete_IT"),
 
@@ -69,6 +66,9 @@ public enum ValidationRulesEnum {
 
   @SerializedName(value = "vaccine_end_day_booster_IT")
   VACCINE_END_DAY_BOOSTER_IT("vaccine_end_day_booster_IT"),
+
+  @SerializedName(value = "vaccine_end_day_complete_under_18")
+  VACCINE_END_DAY_COMPLETE_UNDER_18("vaccine_end_day_complete_under_18"),
 
   @SerializedName(value = "vaccine_start_day_complete_NOT_IT")
   VACCINE_START_DAY_COMPLETE_NOT_IT("vaccine_start_day_complete_NOT_IT"),
@@ -96,6 +96,9 @@ public enum ValidationRulesEnum {
 
   @SerializedName(value = "vaccine_end_day_complete_extended_EMA")
   VACCINE_END_DAY_COMPLETE_EXTENDED_EMA("vaccine_end_day_complete_extended_EMA"),
+
+  @SerializedName(value = "vaccine_complete_under_18_offset")
+  VACCINE_COMPLETE_UNDER_18_OFFSET("vaccine_complete_under_18_offset"),
 
   @SerializedName(value = "EMA_vaccines")
   EMA_VACCINES("EMA_vaccines"),

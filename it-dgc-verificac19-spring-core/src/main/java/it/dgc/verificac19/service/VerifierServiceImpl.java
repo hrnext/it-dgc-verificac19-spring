@@ -402,14 +402,18 @@ public class VerifierServiceImpl implements VerifierService {
     } else if (ValidationScanMode.BOOSTER_DGP.equals(validationScanMode)) {
       return vaccineBoosterStrategy(lastVaccination);
     } else if (ValidationScanMode.ENTRY_ITALY.equals(validationScanMode)) {
-      return vaccineEntryItalyStrategy(lastVaccination);
+      return vaccineEntryItalyStrategy(lastVaccination, birthDate);
     } else {
       return CertificateStatus.NOT_EU_DCC;
     }
   }
 
-  private CertificateStatus vaccineEntryItalyStrategy(VaccinationEntry lastVaccination) {
+  private CertificateStatus vaccineEntryItalyStrategy(VaccinationEntry lastVaccination,
+      LocalDate birthDt) {
     LocalDate dateOfVaccination = lastVaccination.getDt();
+
+    LocalDate birthDate = birthDt.plusDays(Long.parseLong(getVaccineCompleteUnder18Offset()));
+    boolean isUserUnderage = Utility.getAge(birthDate) < Const.VACCINE_UNDERAGE_AGE;
 
     String startDaysToAdd;
     if (isBooster(lastVaccination.getMp(), lastVaccination.getDn(), lastVaccination.getSd())) {
@@ -419,15 +423,15 @@ public class VerifierServiceImpl implements VerifierService {
           getVaccineStartDayCompleteUnified(Country.NOT_IT.getValue(), lastVaccination.getMp());
     }
 
-
     String endDaysToAdd;
-    if (isBooster(lastVaccination.getMp(), lastVaccination.getDn(), lastVaccination.getSd())) {
+    if (isComplete(lastVaccination.getDn(), lastVaccination.getSd()) && isUserUnderage) {
+      endDaysToAdd = getVaccineEndDayCompleteUnder18();
+    } else if (isBooster(lastVaccination.getMp(), lastVaccination.getDn(),
+        lastVaccination.getSd())) {
       endDaysToAdd = getVaccineEndDayBoosterUnified(Country.NOT_IT.getValue());
     } else {
       endDaysToAdd = getVaccineEndDayCompleteUnified(Country.NOT_IT.getValue());
     }
-
-
 
     LocalDate startDate = dateOfVaccination.plusDays(Long.parseLong(startDaysToAdd));
     LocalDate endDate = dateOfVaccination.plusDays(Long.parseLong(endDaysToAdd));
@@ -739,6 +743,16 @@ public class VerifierServiceImpl implements VerifierService {
 
   private String getRecoveryCertPvEndDay() {
     return preferences.getValidationRuleValueByName(ValidationRulesEnum.RECOVERY_CERT_PV_END_DAY);
+  }
+
+  private String getVaccineEndDayCompleteUnder18() {
+    return preferences
+        .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_END_DAY_COMPLETE_UNDER_18);
+  }
+
+  private String getVaccineCompleteUnder18Offset() {
+    return preferences
+        .getValidationRuleValueByName(ValidationRulesEnum.VACCINE_COMPLETE_UNDER_18_OFFSET);
   }
 
   private String getMolecularTestStartHour() {
