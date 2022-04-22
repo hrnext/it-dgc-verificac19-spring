@@ -3,9 +3,7 @@ package it.dgc.verificac19.data.remote;
 import java.io.File;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
-
 import javax.annotation.PostConstruct;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +36,9 @@ public class ApiServiceClient {
 
   @Value(value = "${config.certificate_sha}")
   private String certificateSha;
+
+  @Value(value = "${config.certificate_sha_backup}")
+  private String certificateShaBackup;
 
   private ApiService apiService;
 
@@ -72,8 +73,8 @@ public class ApiServiceClient {
     }
 
     // Certificate
-    builder
-        .certificatePinner(new CertificatePinner.Builder().add(serverHost, certificateSha).build());
+    builder.certificatePinner(new CertificatePinner.Builder().add(serverHost, certificateSha)
+        .add(serverHost, certificateShaBackup).build());
 
     return builder.build();
 
