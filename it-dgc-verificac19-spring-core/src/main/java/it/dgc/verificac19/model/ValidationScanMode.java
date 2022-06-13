@@ -15,11 +15,6 @@ public enum ValidationScanMode {
   /**
    * (BOOSTER / BOOSTED)
    */
-  BOOSTER_DGP,
-
-  /**
-   * (ENTRY_ITALY)
-   */
-  ENTRY_ITALY;
+  BOOSTER_DGP;
 
 }
